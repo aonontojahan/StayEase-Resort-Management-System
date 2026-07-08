@@ -1,0 +1,42 @@
+# =============================================
+# StayEase - Git Ignore Rules
+# =============================================
+
+# ---- Environment & Secrets ----
+.env
+.env.local
+.env.production
+*.pem
+*.key
+
+# ---- Python / Backend ----
+backend/.venv/
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/**/*.pyo
+backend/.pytest_cache/
+backend/**/.pytest_cache/
+backend/htmlcov/
+backend/.coverage
+backend/dist/
+backend/*.egg-info/
+
+# ---- Node / Frontend ----
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.cache/
+
+# ---- IDE / OS ----
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ---- Logs ----
+*.log
+logs/

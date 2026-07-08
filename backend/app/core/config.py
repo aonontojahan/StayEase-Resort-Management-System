@@ -26,11 +26,13 @@ class Settings(BaseSettings):
     @classmethod
     def assemble_db_connection(cls, v: Any) -> Any:
         if isinstance(v, str):
-            # Map standard postgres or postgresql to asyncpg driver
+            # Normalize driver prefix
             if v.startswith("postgres://"):
                 v = v.replace("postgres://", "postgresql+asyncpg://", 1)
             elif v.startswith("postgresql://") and not v.startswith("postgresql+asyncpg://"):
                 v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+            # asyncpg uses ?ssl=require, not ?sslmode=require
+            v = v.replace("sslmode=require", "ssl=require")
             return v
         return v
 
