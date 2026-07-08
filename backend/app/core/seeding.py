@@ -1,6 +1,7 @@
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.repository import RoleRepository, PermissionRepository
+from app.auth.models import Role
 
 logger = logging.getLogger(__name__)
 
@@ -82,15 +83,17 @@ async def seed_db(db: AsyncSession):
 
         # 2. Create roles and link permissions
         for name, desc in DEFAULT_ROLES:
-            role = await role_repo.create_if_not_exists(name, desc)
-            
-            # Map permissions to role
             role_perm_names = ROLE_PERMISSION_MAP.get(name, [])
             role_perms = [created_permissions[p_name] for p_name in role_perm_names if p_name in created_permissions]
-            
-            # Update permissions list
-            role.permissions = role_perms
-            db.add(role)
+
+            role = await role_repo.get_by_name(name)
+            if not role:
+                role = Role(name=name, description=desc, permissions=role_perms)
+                db.add(role)
+            else:
+                role.description = desc
+                role.permissions = role_perms
+                db.add(role)
 
         await db.commit()
         logger.info("Successfully seeded database with roles and permissions.")
