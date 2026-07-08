@@ -37,7 +37,7 @@ async def get_current_user(
         raise UnauthorizedException("Invalid user ID format in token")
 
     user_repo = UserRepository(db)
-    user = await self.user_repo.get_by_id(user_uuid)
+    user = await user_repo.get_by_id(user_uuid)
     if not user:
         raise UnauthorizedException("User not found")
 
