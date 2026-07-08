@@ -1,6 +1,7 @@
 import uuid
 from typing import Optional, Sequence
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import Permission, Role, User
@@ -51,12 +52,16 @@ class RoleRepository:
 
     async def get_by_id(self, role_id: uuid.UUID) -> Optional[Role]:
         """Fetch role by UUID."""
-        result = await self.db.execute(select(Role).where(Role.id == role_id))
+        result = await self.db.execute(
+            select(Role).where(Role.id == role_id).options(selectinload(Role.permissions))
+        )
         return result.scalar_one_or_none()
 
     async def get_by_name(self, name: str) -> Optional[Role]:
         """Fetch role by name (e.g. 'guest')."""
-        result = await self.db.execute(select(Role).where(Role.name == name))
+        result = await self.db.execute(
+            select(Role).where(Role.name == name).options(selectinload(Role.permissions))
+        )
         return result.scalar_one_or_none()
 
     async def create_if_not_exists(self, name: str, description: Optional[str] = None) -> Role:
