@@ -1,7 +1,14 @@
+from typing import List
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, require_role
+from app.auth.models import User
+from app.auth.repository import RoleRepository, UserRepository
+from app.core.exceptions import ForbiddenException, BadRequestException
+from app.core.security import get_password_hash
 from app.auth.models import User
 from app.auth.schemas import (
     ChangePasswordRequest,
@@ -9,6 +16,7 @@ from app.auth.schemas import (
     RefreshRequest,
     Token,
     UserCreate,
+    UserCreateWithRole,
     UserRead,
 )
 from app.auth.service import AuthService
@@ -80,3 +88,43 @@ async def change_password(
 async def logout():
     """Sign out the current user session (client should discard client-side tokens)."""
     return {"detail": "Logged out successfully"}
+
+
+@router.post("/users", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+async def create_user(
+    user_in: UserCreateWithRole,
+    current_user: User = require_role(["Super Admin", "Resort Owner", "Manager"]),
+    db: AsyncSession = Depends(get_db)
+):
+    """Create a user with a specific role. Restricted to Admins/Owners/Managers."""
+    if current_user.role.name == "Manager" and user_in.role_name in ["Super Admin", "Resort Owner", "Manager"]:
+        raise ForbiddenException("Managers cannot create other Managers or Owners/Admins.")
+
+    user_repo = UserRepository(db)
+    role_repo = RoleRepository(db)
+
+    existing_user = await user_repo.get_by_email(user_in.email)
+    if existing_user:
+        raise BadRequestException("User with this email already exists.")
+
+    target_role = await role_repo.get_by_name(user_in.role_name)
+    if not target_role:
+        raise BadRequestException(f"Role '{user_in.role_name}' does not exist.")
+
+    hashed_pw = get_password_hash(user_in.password)
+    new_user = await user_repo.create(user_in, hashed_pw, target_role.id)
+    # The repository flush might not eager-load the role, but UserRead requires it.
+    # We can fetch it or just return a dictionary. Let's fetch the full user.
+    full_user = await user_repo.get_by_id(new_user.id)
+    return UserRead.model_validate(full_user)
+
+
+@router.get("/users", response_model=List[UserRead])
+async def list_users(
+    current_user: User = require_role(["Super Admin", "Resort Owner", "Manager"]),
+    db: AsyncSession = Depends(get_db)
+):
+    """List all users. Restricted to Admins/Owners/Managers."""
+    result = await db.execute(select(User).options(selectinload(User.role)))
+    users = result.scalars().all()
+    return [UserRead.model_validate(u) for u in users]

@@ -35,6 +35,10 @@ class UserCreate(UserBase):
     password: str = Field(..., min_length=6, max_length=50)
 
 
+class UserCreateWithRole(UserCreate):
+    role_name: str
+
+
 class UserRead(UserBase):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID

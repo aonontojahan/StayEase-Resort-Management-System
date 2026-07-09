@@ -95,8 +95,34 @@ async def seed_db(db: AsyncSession):
                 role.permissions = role_perms
                 db.add(role)
 
+        # 3. Create default Resort Owner user if not exists
+        from app.auth.models import User
+        from app.auth.repository import UserRepository
+        from app.core.security import get_password_hash
+
+        owner_email = "aonontojahan@gmail.com"
+        owner_role = await role_repo.get_by_name("Resort Owner")
+        if owner_role:
+            user_repo = UserRepository(db)
+            owner_user = await user_repo.get_by_email(owner_email)
+            if not owner_user:
+                hashed_pw = get_password_hash("aonontojahan")
+                owner_user = User(
+                    email=owner_email,
+                    hashed_password=hashed_pw,
+                    full_name="Resort Owner",
+                    phone_number="+8801700000000",
+                    role_id=owner_role.id,
+                    is_active=True,
+                    is_verified=True,
+                )
+                db.add(owner_user)
+                logger.info(f"Successfully seeded default Resort Owner: {owner_email}")
+            else:
+                logger.info(f"Default Resort Owner {owner_email} already exists.")
+
         await db.commit()
-        logger.info("Successfully seeded database with roles and permissions.")
+        logger.info("Successfully seeded database with roles, permissions, and default admin.")
     except Exception as e:
         logger.error(f"Error seeding database: {e}")
         await db.rollback()
