@@ -27,6 +27,16 @@ async def list_payments(
     return await repo.get_all()
 
 
+@router.get("/my", response_model=List[PaymentRead])
+async def list_my_payments(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List current guest's payments."""
+    repo = PaymentRepository(db)
+    return await repo.get_by_guest(current_user.id)
+
+
 @router.get("/summary", response_model=RevenueSummary)
 async def revenue_summary(
     _: User = require_role(["Super Admin", "Resort Owner", "Manager", "Accountant"]),

@@ -80,21 +80,28 @@ async def revenue_report(
 ):
     """Return monthly revenue data."""
     result = await db.execute(
-        select(
-            func.date_trunc("month", Payment.created_at).label("month"),
-            func.sum(Payment.amount).label("revenue"),
-            func.count(Payment.id).label("count"),
-        )
+        select(Payment.created_at, Payment.amount)
         .where(Payment.status == PaymentStatus.completed)
-        .group_by("month")
-        .order_by("month")
     )
     rows = result.all()
+    
+    monthly_data = {}
+    for row in rows:
+        if not row.created_at:
+            continue
+        month_str = row.created_at.strftime("%Y-%m")
+        if month_str not in monthly_data:
+            monthly_data[month_str] = {"revenue": 0.0, "count": 0}
+        
+        monthly_data[month_str]["revenue"] += float(row.amount or 0)
+        monthly_data[month_str]["count"] += 1
+
+    sorted_months = sorted(monthly_data.keys())
     return [
         {
-            "month": row.month.strftime("%Y-%m") if row.month else None,
-            "revenue": float(row.revenue or 0),
-            "count": int(row.count or 0),
+            "month": m,
+            "revenue": monthly_data[m]["revenue"],
+            "count": monthly_data[m]["count"],
         }
-        for row in rows
+        for m in sorted_months
     ]

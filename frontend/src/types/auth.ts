@@ -34,3 +34,15 @@ export interface ApiError {
   detail: string;
   status?: string;
 }
+
+export interface LoginRequest {
+  email: string;
+  password?: string; // used for forms
+}
+
+export interface UserCreate {
+  email: string;
+  password?: string;
+  full_name: string;
+  phone_number?: string;
+}

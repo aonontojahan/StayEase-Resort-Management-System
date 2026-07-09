@@ -5,11 +5,23 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.auth.router import router as auth_router
+from app.rooms.router import router as rooms_router
+from app.bookings.router import router as bookings_router
+from app.housekeeping.router import router as housekeeping_router
+from app.payments.router import router as payments_router
+from app.reports.router import router as reports_router
 from app.core.config import settings
 from app.core.database import Base, engine, SessionLocal
 from app.core.exceptions import StayEaseException
 from app.core.logging import setup_logging
 from app.core.seeding import seed_db
+
+# Import all models so SQLAlchemy picks them up for create_all
+import app.auth.models  # noqa
+import app.rooms.models  # noqa
+import app.bookings.models  # noqa
+import app.housekeeping.models  # noqa
+import app.payments.models  # noqa
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +38,7 @@ async def lifespan(app: FastAPI):
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
-        # Seed initial roles and permissions
+        # Seed initial roles, permissions, and sample data
         async with SessionLocal() as session:
             await seed_db(session)
 
@@ -40,7 +52,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description="Backend API for StayEase Resort Management System",
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -68,8 +80,7 @@ async def stayease_exception_handler(request: Request, exc: StayEaseException):
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     logger.exception(f"Unhandled critical error on {request.url.path}: {str(exc)}")
-    
-    # Hide details in production environment
+
     message = "An internal server error occurred."
     if settings.ENVIRONMENT == "development":
         message = str(exc)
@@ -86,5 +97,10 @@ async def health_check():
     return {"status": "healthy", "service": settings.PROJECT_NAME}
 
 
-# Include Routers
+# Include all Routers
 app.include_router(auth_router, prefix=settings.API_V1_STR)
+app.include_router(rooms_router, prefix=settings.API_V1_STR)
+app.include_router(bookings_router, prefix=settings.API_V1_STR)
+app.include_router(housekeeping_router, prefix=settings.API_V1_STR)
+app.include_router(payments_router, prefix=settings.API_V1_STR)
+app.include_router(reports_router, prefix=settings.API_V1_STR)

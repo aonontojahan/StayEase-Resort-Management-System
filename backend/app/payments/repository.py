@@ -36,6 +36,19 @@ class PaymentRepository:
         )
         return result.scalars().all()
 
+    async def get_by_guest(self, guest_id: uuid.UUID) -> Sequence[Payment]:
+        result = await self.db.execute(
+            select(Payment)
+            .join(Booking, Payment.booking_id == Booking.id)
+            .where(Booking.guest_id == guest_id)
+            .options(
+                selectinload(Payment.booking),
+                selectinload(Payment.recorded_by),
+            )
+            .order_by(Payment.created_at.desc())
+        )
+        return result.scalars().all()
+
     async def get_by_id(self, payment_id: uuid.UUID) -> Optional[Payment]:
         result = await self.db.execute(
             select(Payment)
