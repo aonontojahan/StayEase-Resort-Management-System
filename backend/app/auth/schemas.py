@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import List, Optional
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class PermissionBase(BaseModel):
@@ -59,8 +59,15 @@ class UserUpdate(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: EmailStr = Field(..., description="Email address, stripped of whitespace")
     password: str
+
+    @field_validator('email', mode='before')
+    @classmethod
+    def strip_email(cls, v: str) -> str:
+        if isinstance(v, str):
+            return v.strip()
+        return v
 
 
 class RefreshRequest(BaseModel):

@@ -11,7 +11,7 @@ from app.rooms.models import Room, RoomStatus
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
 
-ANALYTICS_ROLES = ["Super Admin", "Resort Owner", "Manager", "Accountant"]
+ANALYTICS_ROLES = ["Resort Owner", "Manager", "Accountant"]
 
 
 @router.get("/occupancy")

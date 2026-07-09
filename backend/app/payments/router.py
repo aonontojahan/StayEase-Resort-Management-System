@@ -14,7 +14,7 @@ from app.payments.schemas import PaymentCreate, PaymentRead, RevenueSummary
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
 
-FINANCE_ROLES = ["Super Admin", "Resort Owner", "Manager", "Accountant", "Receptionist"]
+FINANCE_ROLES = ["Resort Owner", "Manager", "Accountant", "Receptionist"]
 
 
 @router.get("/", response_model=List[PaymentRead])
@@ -39,7 +39,7 @@ async def list_my_payments(
 
 @router.get("/summary", response_model=RevenueSummary)
 async def revenue_summary(
-    _: User = require_role(["Super Admin", "Resort Owner", "Manager", "Accountant"]),
+    _: User = require_role(["Resort Owner", "Manager", "Accountant"]),
     db: AsyncSession = Depends(get_db),
 ):
     """Get aggregated revenue summary."""

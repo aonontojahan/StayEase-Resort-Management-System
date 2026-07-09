@@ -51,35 +51,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [])
 
   const login = async (credentials: LoginRequest) => {
-    setIsLoading(true)
-    try {
-      const response = await api.post<TokenResponse>("/auth/login", credentials)
-      const { access_token, refresh_token, user: loggedUser } = response.data
-      
-      localStorage.setItem("accessToken", access_token)
-      localStorage.setItem("refreshToken", refresh_token)
-      localStorage.setItem("user", JSON.stringify(loggedUser))
-      
-      setUser(loggedUser)
-    } finally {
-      setIsLoading(false)
-    }
+    const response = await api.post<TokenResponse>("/auth/login", credentials)
+    const { access_token, refresh_token, user: loggedUser } = response.data
+
+    localStorage.setItem("accessToken", access_token)
+    localStorage.setItem("refreshToken", refresh_token)
+    localStorage.setItem("user", JSON.stringify(loggedUser))
+
+    setUser(loggedUser)
   }
 
   const register = async (userIn: UserCreate) => {
-    setIsLoading(true)
-    try {
-      const response = await api.post<TokenResponse>("/auth/register", userIn)
-      const { access_token, refresh_token, user: registeredUser } = response.data
+    const response = await api.post<TokenResponse>("/auth/register", userIn)
+    const { access_token, refresh_token, user: registeredUser } = response.data
 
-      localStorage.setItem("accessToken", access_token)
-      localStorage.setItem("refreshToken", refresh_token)
-      localStorage.setItem("user", JSON.stringify(registeredUser))
+    localStorage.setItem("accessToken", access_token)
+    localStorage.setItem("refreshToken", refresh_token)
+    localStorage.setItem("user", JSON.stringify(registeredUser))
 
-      setUser(registeredUser)
-    } finally {
-      setIsLoading(false)
-    }
+    setUser(registeredUser)
   }
 
   const logout = async () => {

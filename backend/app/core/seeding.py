@@ -6,7 +6,6 @@ from app.auth.models import Role
 logger = logging.getLogger(__name__)
 
 DEFAULT_ROLES = [
-    ("Super Admin", "Has full access to all resources and resorts across the system."),
     ("Resort Owner", "Owns and manages resort configurations, billing, and personnel."),
     ("Manager", "Manages operations, rooms, bookings, and housekeeping for a resort."),
     ("Receptionist", "Handles guest check-ins, check-outs, bookings, and guest files."),
@@ -38,7 +37,6 @@ DEFAULT_PERMISSIONS = [
 
 # Map roles to their permission list
 ROLE_PERMISSION_MAP = {
-    "Super Admin": [p[0] for p in DEFAULT_PERMISSIONS],
     "Resort Owner": [p[0] for p in DEFAULT_PERMISSIONS],
     "Manager": [
         "bookings:create", "bookings:read", "bookings:write",
@@ -121,27 +119,26 @@ async def seed_db(db: AsyncSession):
             else:
                 logger.info(f"Default Resort Owner {owner_email} already exists.")
 
-        # 4. Create default Super Admin user if not exists
-        super_admin_email = "admin@stayease.com"
-        super_admin_role = await role_repo.get_by_name("Super Admin")
-        if super_admin_role:
-            user_repo = UserRepository(db)
-            super_admin_user = await user_repo.get_by_email(super_admin_email)
-            if not super_admin_user:
-                hashed_pw = get_password_hash("admin@stayease")
-                super_admin_user = User(
-                    email=super_admin_email,
+        # 4. Create default demo Guest user if not exists
+        guest_email = "guest@stayease.com"
+        guest_role = await role_repo.get_by_name("Guest")
+        if guest_role:
+            guest_user = await user_repo.get_by_email(guest_email)
+            if not guest_user:
+                hashed_pw = get_password_hash("guest123")
+                guest_user = User(
+                    email=guest_email,
                     hashed_password=hashed_pw,
-                    full_name="Super Admin",
-                    phone_number="+10000000000",
-                    role_id=super_admin_role.id,
+                    full_name="Demo Guest",
+                    phone_number="+8801800000000",
+                    role_id=guest_role.id,
                     is_active=True,
                     is_verified=True,
                 )
-                db.add(super_admin_user)
-                logger.info(f"Successfully seeded default Super Admin: {super_admin_email}")
+                db.add(guest_user)
+                logger.info(f"Successfully seeded demo Guest: {guest_email}")
             else:
-                logger.info(f"Default Super Admin {super_admin_email} already exists.")
+                logger.info(f"Demo Guest {guest_email} already exists.")
 
         await db.commit()
         logger.info("Successfully seeded database with roles, permissions, and default admin.")

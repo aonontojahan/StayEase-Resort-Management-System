@@ -31,7 +31,7 @@ async def list_room_types(
 @router.post("/room-types", response_model=RoomTypeRead, status_code=status.HTTP_201_CREATED)
 async def create_room_type(
     data: RoomTypeCreate,
-    _: User = require_role(["Super Admin", "Resort Owner", "Manager"]),
+    _: User = require_role(["Resort Owner", "Manager"]),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new room type."""
@@ -46,7 +46,7 @@ async def create_room_type(
 async def update_room_type(
     room_type_id: uuid.UUID,
     data: RoomTypeCreate,
-    _: User = require_role(["Super Admin", "Resort Owner", "Manager"]),
+    _: User = require_role(["Resort Owner", "Manager"]),
     db: AsyncSession = Depends(get_db),
 ):
     """Update a room type."""
@@ -60,7 +60,7 @@ async def update_room_type(
 @router.delete("/room-types/{room_type_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_room_type(
     room_type_id: uuid.UUID,
-    _: User = require_role(["Super Admin", "Resort Owner"]),
+    _: User = require_role(["Resort Owner"]),
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a room type."""
@@ -114,7 +114,7 @@ async def get_room(
 @router.post("/rooms", response_model=RoomRead, status_code=status.HTTP_201_CREATED)
 async def create_room(
     data: RoomCreate,
-    _: User = require_role(["Super Admin", "Resort Owner", "Manager"]),
+    _: User = require_role(["Resort Owner", "Manager"]),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new room."""
@@ -130,7 +130,7 @@ async def create_room(
 async def update_room(
     room_id: uuid.UUID,
     data: RoomUpdate,
-    _: User = require_role(["Super Admin", "Resort Owner", "Manager"]),
+    _: User = require_role(["Resort Owner", "Manager"]),
     db: AsyncSession = Depends(get_db),
 ):
     """Update a room."""
@@ -145,7 +145,7 @@ async def update_room(
 @router.delete("/rooms/{room_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_room(
     room_id: uuid.UUID,
-    _: User = require_role(["Super Admin", "Resort Owner"]),
+    _: User = require_role(["Resort Owner"]),
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a room."""

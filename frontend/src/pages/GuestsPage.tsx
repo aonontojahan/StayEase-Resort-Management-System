@@ -45,7 +45,6 @@ export const GuestsPage: React.FC = () => {
     Housekeeping: "bg-green-100 text-green-800",
     Accountant: "bg-orange-100 text-orange-800",
     Guest: "bg-gray-100 text-gray-700",
-    "Super Admin": "bg-red-100 text-red-800",
   }
 
   return (

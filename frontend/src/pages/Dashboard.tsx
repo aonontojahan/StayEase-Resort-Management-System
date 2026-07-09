@@ -51,11 +51,22 @@ export const Dashboard: React.FC = () => {
   })
 
   useEffect(() => {
-    if (user && activeTab === "Dashboard" && ["Super Admin", "Resort Owner", "Manager", "Accountant"].includes(user.role.name)) {
+    if (user && activeTab === "Dashboard" && ["Resort Owner", "Manager", "Accountant"].includes(user.role.name)) {
       api.get<OccupancyReport>("/reports/occupancy").then(res => setOccupancy(res.data)).catch(() => {})
       api.get<BookingsSummary>("/reports/bookings-summary").then(res => setBookingsSummary(res.data)).catch(() => {})
     }
   }, [user, activeTab])
+
+  // Set default tab based on role if they are on "Dashboard"
+  useEffect(() => {
+    if (user) {
+      if (user.role.name === "Guest" && activeTab === "Dashboard") {
+        setActiveTab("Browse Rooms")
+      } else if (user.role.name === "Housekeeping" && activeTab === "Dashboard") {
+        setActiveTab("Housekeeping Tasks")
+      }
+    }
+  }, [user])
 
   const onPasswordSubmit = async (data: PasswordFormValues) => {
     setSuccessMsg(null)
@@ -82,7 +93,7 @@ export const Dashboard: React.FC = () => {
         <Home className="h-4 w-4" />
         <span>Dashboard</span>
       </button>
-      {user.role.name === "Resort Owner" || user.role.name === "Manager" || user.role.name === "Super Admin" ? (
+      {user.role.name === "Resort Owner" || user.role.name === "Manager" ? (
         <>
           <button onClick={() => handleTabChange("Staff Management")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Staff Management" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
             <Users className="h-4 w-4" />
@@ -169,7 +180,7 @@ export const Dashboard: React.FC = () => {
             </div>
 
             {/* Status widgets row - Only for analytics roles */}
-            {["Super Admin", "Resort Owner", "Manager", "Accountant"].includes(user.role.name) && occupancy && bookingsSummary && (
+            {["Resort Owner", "Manager", "Accountant"].includes(user.role.name) && occupancy && bookingsSummary && (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="rounded-xl border bg-card p-5 shadow-sm space-y-2">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Occupancy Rate</p>

@@ -93,11 +93,11 @@ async def logout():
 @router.post("/users", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 async def create_user(
     user_in: UserCreateWithRole,
-    current_user: User = require_role(["Super Admin", "Resort Owner", "Manager"]),
+    current_user: User = require_role(["Resort Owner", "Manager"]),
     db: AsyncSession = Depends(get_db)
 ):
     """Create a user with a specific role. Restricted to Admins/Owners/Managers."""
-    if current_user.role.name == "Manager" and user_in.role_name in ["Super Admin", "Resort Owner", "Manager"]:
+    if current_user.role.name == "Manager" and user_in.role_name in ["Resort Owner", "Manager"]:
         raise ForbiddenException("Managers cannot create other Managers or Owners/Admins.")
 
     user_repo = UserRepository(db)
@@ -121,7 +121,7 @@ async def create_user(
 
 @router.get("/users", response_model=List[UserRead])
 async def list_users(
-    current_user: User = require_role(["Super Admin", "Resort Owner", "Manager"]),
+    current_user: User = require_role(["Resort Owner", "Manager"]),
     db: AsyncSession = Depends(get_db)
 ):
     """List all users. Restricted to Admins/Owners/Managers."""

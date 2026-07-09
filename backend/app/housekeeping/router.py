@@ -14,8 +14,8 @@ from app.housekeeping.schemas import TaskCreate, TaskRead, TaskStatusUpdate
 
 router = APIRouter(prefix="/housekeeping", tags=["Housekeeping"])
 
-MANAGEMENT_ROLES = ["Super Admin", "Resort Owner", "Manager"]
-HOUSEKEEPING_ROLES = ["Super Admin", "Resort Owner", "Manager", "Housekeeping"]
+MANAGEMENT_ROLES = ["Resort Owner", "Manager"]
+HOUSEKEEPING_ROLES = ["Resort Owner", "Manager", "Housekeeping"]
 
 
 @router.get("/", response_model=List[TaskRead])

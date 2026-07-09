@@ -121,7 +121,7 @@ async def update_booking_status(
 @router.delete("/{booking_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_booking(
     booking_id: uuid.UUID,
-    _: User = require_role(["Super Admin", "Resort Owner", "Manager"]),
+    _: User = require_role(["Resort Owner", "Manager"]),
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a booking."""
