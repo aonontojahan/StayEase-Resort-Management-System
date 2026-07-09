@@ -121,6 +121,28 @@ async def seed_db(db: AsyncSession):
             else:
                 logger.info(f"Default Resort Owner {owner_email} already exists.")
 
+        # 4. Create default Super Admin user if not exists
+        super_admin_email = "admin@stayease.com"
+        super_admin_role = await role_repo.get_by_name("Super Admin")
+        if super_admin_role:
+            user_repo = UserRepository(db)
+            super_admin_user = await user_repo.get_by_email(super_admin_email)
+            if not super_admin_user:
+                hashed_pw = get_password_hash("admin@stayease")
+                super_admin_user = User(
+                    email=super_admin_email,
+                    hashed_password=hashed_pw,
+                    full_name="Super Admin",
+                    phone_number="+10000000000",
+                    role_id=super_admin_role.id,
+                    is_active=True,
+                    is_verified=True,
+                )
+                db.add(super_admin_user)
+                logger.info(f"Successfully seeded default Super Admin: {super_admin_email}")
+            else:
+                logger.info(f"Default Super Admin {super_admin_email} already exists.")
+
         await db.commit()
         logger.info("Successfully seeded database with roles, permissions, and default admin.")
     except Exception as e:

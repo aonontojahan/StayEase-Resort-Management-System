@@ -42,40 +42,46 @@ export const Login: React.FC = () => {
   return (
     <div className="flex min-h-screen w-screen bg-background">
       {/* Left side: Premium Branding & Visual Backdrop (Desktop only) */}
-      <div className="relative hidden w-1/2 flex-col justify-between bg-slate-900 p-12 text-white lg:flex overflow-hidden">
-        {/* Subtle radial ambient glows */}
-        <div className="absolute -left-1/4 -top-1/4 h-[70%] w-[70%] rounded-full bg-primary/20 blur-[120px] pointer-events-none"></div>
-        <div className="absolute -bottom-1/4 -right-1/4 h-[70%] w-[70%] rounded-full bg-blue-500/10 blur-[120px] pointer-events-none"></div>
+      <div className="relative hidden w-1/2 flex-col justify-between bg-emerald-950 p-12 text-white lg:flex overflow-hidden">
+        {/* Background Image with overlay */}
+        <div className="absolute inset-0 z-0">
+          <img 
+            src="https://images.unsplash.com/photo-1542314831-c6a4d1409362?q=80&w=2070&auto=format&fit=crop" 
+            alt="Luxury Resort" 
+            className="w-full h-full object-cover opacity-40 mix-blend-overlay"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-emerald-950 via-emerald-950/80 to-transparent"></div>
+        </div>
         
         {/* Header Logo */}
         <div className="relative z-10 flex items-center gap-2 text-xl font-bold tracking-tight">
-          <svg className="h-6 w-6 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg className="h-6 w-6 text-yellow-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
             <polyline points="9 22 9 12 15 12 15 22"/>
           </svg>
-          <span>StayEase <span className="text-primary-foreground/75 font-normal text-sm">Resort System</span></span>
+          <span className="font-serif text-2xl">StayEase <span className="text-emerald-200/75 font-sans font-normal text-sm ml-2">Resort System</span></span>
         </div>
 
         {/* Content Showcase */}
         <div className="relative z-10 my-auto max-w-lg space-y-6">
-          <h1 className="text-4xl font-extrabold tracking-tight leading-tight lg:text-5xl">
+          <h1 className="text-4xl font-serif tracking-wide leading-tight lg:text-5xl text-yellow-50">
             Streamlining resort hospitality, globally.
           </h1>
-          <p className="text-lg text-slate-300">
+          <p className="text-lg text-emerald-100/90 font-light leading-relaxed">
             A comprehensive, cloud-native platform for reservations, guest profiling, payments, housekeeping, and real-time operations.
           </p>
           <div className="flex gap-4 items-center pt-2">
             <div className="flex -space-x-2">
-              <span className="inline-block h-8 w-8 rounded-full ring-2 ring-slate-950 bg-slate-800 flex items-center justify-center text-xs font-semibold text-primary">SA</span>
-              <span className="inline-block h-8 w-8 rounded-full ring-2 ring-slate-950 bg-slate-800 flex items-center justify-center text-xs font-semibold text-primary">RO</span>
-              <span className="inline-block h-8 w-8 rounded-full ring-2 ring-slate-950 bg-slate-800 flex items-center justify-center text-xs font-semibold text-primary">MG</span>
+              <span className="inline-block h-8 w-8 rounded-full ring-2 ring-emerald-950 bg-emerald-800 flex items-center justify-center text-xs font-semibold text-yellow-500">SA</span>
+              <span className="inline-block h-8 w-8 rounded-full ring-2 ring-emerald-950 bg-emerald-800 flex items-center justify-center text-xs font-semibold text-yellow-500">RO</span>
+              <span className="inline-block h-8 w-8 rounded-full ring-2 ring-emerald-950 bg-emerald-800 flex items-center justify-center text-xs font-semibold text-yellow-500">MG</span>
             </div>
-            <span className="text-sm text-slate-400">Trusted by modern hotel managers.</span>
+            <span className="text-sm text-emerald-200">Trusted by top-tier hotel managers.</span>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="relative z-10 text-xs text-slate-400">
+        <div className="relative z-10 text-xs text-emerald-400">
           © {new Date().getFullYear()} StayEase Inc. All rights reserved.
         </div>
       </div>

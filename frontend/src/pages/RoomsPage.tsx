@@ -155,12 +155,12 @@ export const RoomsPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between border-b pb-4">
         <div>
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            <BedDouble className="h-6 w-6 text-primary" /> Rooms Management
+          <h2 className="text-3xl font-serif tracking-wide flex items-center gap-2">
+            <BedDouble className="h-7 w-7 text-primary" /> Rooms Management
           </h2>
-          <p className="text-sm text-muted-foreground mt-0.5">
+          <p className="text-sm text-muted-foreground mt-1">
             {rooms.length} total rooms · {roomTypes.length} room types
           </p>
         </div>

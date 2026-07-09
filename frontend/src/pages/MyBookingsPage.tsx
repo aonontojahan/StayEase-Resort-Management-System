@@ -53,15 +53,15 @@ export const MyBookingsPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6 max-w-5xl">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-8 max-w-5xl">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between border-b pb-4">
         <div>
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            <BookOpen className="h-6 w-6 text-primary" /> My Bookings
+          <h2 className="text-3xl font-serif tracking-wide flex items-center gap-2">
+            <BookOpen className="h-7 w-7 text-primary" /> My Bookings
           </h2>
-          <p className="text-sm text-muted-foreground mt-0.5">View and manage your resort reservations.</p>
+          <p className="text-sm text-muted-foreground mt-1">View and manage your resort reservations.</p>
         </div>
-        <button onClick={fetchBookings} className="rounded-lg border p-2 hover:bg-secondary transition-colors w-fit" title="Refresh">
+        <button onClick={fetchBookings} className="rounded-lg border bg-card p-2.5 hover:bg-secondary hover:text-secondary-foreground transition-all w-fit shadow-sm" title="Refresh">
           <RefreshCw className="h-4 w-4 text-muted-foreground" />
         </button>
       </div>

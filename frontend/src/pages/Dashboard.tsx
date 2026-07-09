@@ -157,12 +157,13 @@ export const Dashboard: React.FC = () => {
         return (
           <>
             {/* Welcome Panel */}
-            <div className="rounded-2xl bg-gradient-to-r from-slate-900 to-indigo-950 p-6 md:p-8 text-white shadow-xl relative overflow-hidden">
-              <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-primary/25 blur-3xl"></div>
+            <div className="rounded-2xl bg-gradient-to-br from-emerald-900 via-teal-900 to-slate-900 p-6 md:p-8 text-white shadow-xl relative overflow-hidden">
+              <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-yellow-500/20 blur-3xl"></div>
+              <div className="absolute left-1/2 top-0 h-full w-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
               <div className="relative z-10 space-y-2">
-                <h2 className="text-2xl font-bold md:text-3xl">Welcome back, {user.full_name}!</h2>
-                <p className="text-indigo-200 text-sm md:text-base max-w-xl">
-                  StayEase session active. Below you can view your current account profile attributes and manage security credentials.
+                <h2 className="text-2xl font-bold md:text-3xl font-serif tracking-wide">Welcome back, {user.full_name}!</h2>
+                <p className="text-emerald-100 text-sm md:text-base max-w-xl">
+                  StayEase session active. Here is an overview of your resort operations and account settings.
                 </p>
               </div>
             </div>

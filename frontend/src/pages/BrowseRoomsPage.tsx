@@ -119,14 +119,17 @@ export const BrowseRoomsPage: React.FC = () => {
           ) : (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {rooms.map((room) => (
-                <div key={room.id} className="rounded-xl border bg-card shadow-sm overflow-hidden flex flex-col group">
-                  <div className="aspect-video bg-muted/50 relative overflow-hidden flex items-center justify-center text-muted-foreground">
-                    {/* Placeholder image since we don't have real images */}
-                    <BedDouble className="h-12 w-12 opacity-20" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                    <div className="absolute bottom-3 left-3 text-white">
-                      <p className="font-bold text-lg leading-tight">{room.room_type.name}</p>
-                      <p className="text-xs text-white/80">Room {room.room_number} · Floor {room.floor}</p>
+                <div key={room.id} className="rounded-xl border bg-card shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col group cursor-pointer">
+                  <div className="aspect-[4/3] bg-muted/50 relative overflow-hidden flex items-center justify-center text-muted-foreground">
+                    <img 
+                      src={`https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?q=80&w=800&auto=format&fit=crop&sig=${room.id}`} 
+                      alt="Room" 
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-emerald-950/90 via-emerald-950/40 to-transparent" />
+                    <div className="absolute bottom-4 left-4 text-white z-10">
+                      <p className="font-serif text-2xl tracking-wide leading-tight text-yellow-50">{room.room_type.name}</p>
+                      <p className="text-sm text-emerald-100 font-light mt-0.5">Room {room.room_number} · Floor {room.floor}</p>
                     </div>
                   </div>
                   
