@@ -145,7 +145,7 @@ async def update_room(
 @router.delete("/rooms/{room_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_room(
     room_id: uuid.UUID,
-    _: User = require_role(["Resort Owner"]),
+    _: User = require_role(["Resort Owner", "Manager"]),
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a room."""

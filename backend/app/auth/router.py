@@ -97,8 +97,8 @@ async def create_user(
     db: AsyncSession = Depends(get_db)
 ):
     """Create a user with a specific role. Restricted to Admins/Owners/Managers."""
-    if current_user.role.name == "Manager" and user_in.role_name in ["Resort Owner", "Manager"]:
-        raise ForbiddenException("Managers cannot create other Managers or Owners/Admins.")
+    if current_user.role.name == "Manager" and user_in.role_name == "Resort Owner":
+        raise ForbiddenException("Managers cannot create Resort Owners.")
 
     user_repo = UserRepository(db)
     role_repo = RoleRepository(db)

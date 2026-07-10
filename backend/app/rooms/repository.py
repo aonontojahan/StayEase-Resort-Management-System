@@ -51,7 +51,7 @@ class RoomRepository:
 
     async def get_all(self) -> Sequence[Room]:
         result = await self.db.execute(
-            select(Room).options(selectinload(Room.room_type))
+            select(Room).options(selectinload(Room.room_type)).order_by(Room.room_number)
         )
         return result.scalars().all()
 
@@ -84,6 +84,7 @@ class RoomRepository:
                 Room.id.notin_(booked_subq),
                 Room.status.in_(["Available", "Cleaning"]),
             )
+            .order_by(Room.room_number)
         )
         return result.scalars().all()
 
