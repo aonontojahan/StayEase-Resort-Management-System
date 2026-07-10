@@ -79,15 +79,17 @@ export const RoomsPage: React.FC = () => {
     fetchData()
   }, [])
 
-  // Apply filters
-  const filtered = rooms.filter((r) => {
-    const matchSearch =
-      !search ||
-      r.room_number.toLowerCase().includes(search.toLowerCase()) ||
-      r.room_type.name.toLowerCase().includes(search.toLowerCase())
-    const matchStatus = !filterStatus || r.status === filterStatus
-    return matchSearch && matchStatus
-  })
+  // Apply filters and sort rooms by number (ascending)
+  const filtered = rooms
+    .filter((r) => {
+      const matchSearch =
+        !search ||
+        r.room_number.toLowerCase().includes(search.toLowerCase()) ||
+        r.room_type.name.toLowerCase().includes(search.toLowerCase())
+      const matchStatus = !filterStatus || r.status === filterStatus
+      return matchSearch && matchStatus
+    })
+    .sort((a, b) => a.room_number.localeCompare(b.room_number, undefined, { numeric: true }))
 
   // Create Room
   const onCreateRoom = async (data: RoomCreate) => {
