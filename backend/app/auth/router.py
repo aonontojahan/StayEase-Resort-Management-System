@@ -18,6 +18,7 @@ from app.auth.schemas import (
     UserCreate,
     UserCreateWithRole,
     UserRead,
+    UserUpdate,
 )
 from app.auth.service import AuthService
 from app.core.database import get_db
@@ -70,6 +71,24 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
 async def read_current_user(current_user: User = Depends(get_current_user)):
     """Retrieve details of the currently authenticated user."""
     return UserRead.model_validate(current_user)
+
+
+@router.patch("/me", response_model=UserRead)
+async def update_current_user(
+    body: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update the current user's profile (full_name, phone_number)."""
+    user_repo = UserRepository(db)
+    update_data = body.model_dump(exclude_unset=True, exclude={"email", "password", "is_active", "is_verified"})
+    updated_user = await user_repo.update(current_user, update_data)
+    # Re-fetch to ensure role is eagerly loaded for serialization
+    from sqlalchemy.orm import selectinload as _sli
+    from sqlalchemy import select as _sel
+    result = await db.execute(_sel(User).where(User.id == updated_user.id).options(_sli(User.role)))
+    full_user = result.scalar_one()
+    return UserRead.model_validate(full_user)
 
 
 @router.post("/change-password", status_code=status.HTTP_200_OK)

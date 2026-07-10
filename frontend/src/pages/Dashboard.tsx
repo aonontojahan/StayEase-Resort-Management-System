@@ -6,10 +6,11 @@ import { z } from "zod"
 import { api } from "@/services/api"
 import { OccupancyReport, BookingsSummary } from "@/types/api"
 import { 
-  LogOut, User, Mail, Shield, CheckCircle, Clock, Key, Loader2, 
-  Home, BookOpen, BedDouble, Users, Sparkles, CreditCard, Settings as SettingsIcon, Menu, X
+  User, Mail, Shield, CheckCircle, Clock, Key, Loader2, 
+  Home, BookOpen, BedDouble, Users, Sparkles, CreditCard, Menu, X
 } from "lucide-react"
 
+import { Modal } from "@/components/Modal"
 import { StaffManagement } from "@/components/StaffManagement"
 import { RoomsPage } from "@/pages/RoomsPage"
 import { BookingsPage } from "@/pages/BookingsPage"
@@ -21,6 +22,9 @@ import { MyBookingsPage } from "@/pages/MyBookingsPage"
 import { BrowseRoomsPage } from "@/pages/BrowseRoomsPage"
 import { PaymentHistoryPage } from "@/pages/PaymentHistoryPage"
 import { HousekeepingTasksPage } from "@/pages/HousekeepingTasksPage"
+import { UserMenu } from "@/components/UserMenu"
+import { NotificationBell } from "@/components/NotificationBell"
+import { EditProfileModal, SecurityModal } from "@/components/ProfileModals"
 
 const passwordSchema = z.object({
   old_password: z.string().min(1, "Old password is required"),
@@ -35,6 +39,8 @@ export const Dashboard: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<string>("Dashboard")
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [editProfileOpen, setEditProfileOpen] = useState(false)
+  const [securityOpen, setSecurityOpen] = useState(false)
 
   // Live stats
   const [occupancy, setOccupancy] = useState<OccupancyReport | null>(null)
@@ -118,10 +124,6 @@ export const Dashboard: React.FC = () => {
           <button onClick={() => handleTabChange("Payments")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Payments" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
             <CreditCard className="h-4 w-4" />
             <span>Payments</span>
-          </button>
-          <button onClick={() => handleTabChange("Settings")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Settings" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
-            <SettingsIcon className="h-4 w-4" />
-            <span>Settings</span>
           </button>
         </>
       ) : user.role.name === "Guest" ? (
@@ -335,6 +337,7 @@ export const Dashboard: React.FC = () => {
   }
 
   return (
+    <>
     <div className="flex h-screen bg-background overflow-hidden">
       
       {/* Sidebar Desktop */}
@@ -352,24 +355,11 @@ export const Dashboard: React.FC = () => {
           </nav>
         </div>
 
-        <div className="border-t pt-4 mt-auto space-y-3">
-          <div className="flex items-center gap-3 px-1">
-            <div className="h-9 w-9 rounded-full bg-primary/15 flex items-center justify-center font-bold text-primary border border-primary/20 shrink-0">
-              {user.full_name.charAt(0).toUpperCase()}
-            </div>
-            <div className="truncate">
-              <p className="text-xs font-semibold truncate max-w-[140px] text-foreground">{user.full_name}</p>
-              <p className="text-[10px] text-muted-foreground truncate max-w-[140px]">{user.email}</p>
-            </div>
-          </div>
-          <button
-            onClick={logout}
-            className="w-full flex items-center justify-center gap-2 rounded-lg border border-destructive/20 bg-destructive/5 hover:bg-destructive hover:text-destructive-foreground px-3 py-2 text-xs font-semibold text-destructive transition-all duration-200"
-            title="Sign Out"
-          >
-            <LogOut className="h-3.5 w-3.5" />
-            <span>Sign Out</span>
-          </button>
+        <div className="border-t pt-4 mt-auto">
+          <UserMenu
+            onEditProfile={() => setEditProfileOpen(true)}
+            onSecurity={() => setSecurityOpen(true)}
+          />
         </div>
       </aside>
 
@@ -398,40 +388,29 @@ export const Dashboard: React.FC = () => {
           </nav>
         </div>
 
-        <div className="border-t pt-4 mt-auto space-y-3">
-          <div className="flex items-center gap-3 px-1">
-            <div className="h-9 w-9 rounded-full bg-primary/15 flex items-center justify-center font-bold text-primary border border-primary/20 shrink-0">
-              {user.full_name.charAt(0).toUpperCase()}
-            </div>
-            <div className="truncate">
-              <p className="text-xs font-semibold truncate max-w-[140px] text-foreground">{user.full_name}</p>
-              <p className="text-[10px] text-muted-foreground truncate max-w-[140px]">{user.email}</p>
-            </div>
-          </div>
-          <button
-            onClick={logout}
-            className="w-full flex items-center justify-center gap-2 rounded-lg border border-destructive/20 bg-destructive/5 hover:bg-destructive hover:text-destructive-foreground px-3 py-2 text-xs font-semibold text-destructive transition-all duration-200"
-            title="Sign Out"
-          >
-            <LogOut className="h-3.5 w-3.5" />
-            <span>Sign Out</span>
-          </button>
+        <div className="border-t pt-4 mt-auto">
+          <UserMenu
+            onEditProfile={() => { setEditProfileOpen(true); setMobileMenuOpen(false) }}
+            onSecurity={() => { setSecurityOpen(true); setMobileMenuOpen(false) }}
+          />
         </div>
       </aside>
 
       {/* Main Content Area */}
       <div className="flex flex-1 flex-col overflow-y-auto w-full">
-        <header className="flex h-16 items-center justify-between border-b bg-card px-6 lg:justify-end shrink-0">
+        <header className="flex h-16 items-center justify-between border-b bg-card px-6 shrink-0">
           <button className="lg:hidden text-muted-foreground hover:text-foreground" onClick={() => setMobileMenuOpen(true)}>
             <Menu className="h-6 w-6" />
           </button>
-          <div className="flex items-center gap-4">
-            <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+          {/* Page title on mobile */}
+          <div className="hidden sm:block lg:hidden">
+            <span className="text-sm font-semibold text-foreground">{activeTab}</span>
+          </div>
+          <div className="flex items-center gap-3 ml-auto">
+            <span className="hidden sm:inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
               {user.role.name}
             </span>
-            <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center font-semibold text-primary">
-              {user.full_name.charAt(0).toUpperCase()}
-            </div>
+            <NotificationBell />
           </div>
         </header>
 
@@ -440,5 +419,10 @@ export const Dashboard: React.FC = () => {
         </main>
       </div>
     </div>
+
+    {/* Profile Modals */}
+    <EditProfileModal open={editProfileOpen} onClose={() => setEditProfileOpen(false)} />
+    <SecurityModal open={securityOpen} onClose={() => setSecurityOpen(false)} />
+    </>
   )
 }

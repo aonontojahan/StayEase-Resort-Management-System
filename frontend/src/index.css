@@ -127,3 +127,90 @@
   transform: translateY(0);
   transition: opacity 300ms, transform 300ms;
 }
+
+/* ─── UserMenu popup (slides up from bottom) ────────────────────────────── */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-slide-up {
+  animation: slideUp 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ─── Settings sub-items expand (slides down) ───────────────────────────── */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-slide-down {
+  animation: slideDown 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ─── Notification panel (slides down from top-right) ───────────────────── */
+@keyframes slideDownFromTop {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-slide-down-from-top {
+  animation: slideDownFromTop 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ─── Modal scale-in ────────────────────────────────────────────────────── */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+.animate-scale-in {
+  animation: scaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ─── Backdrop fade-in ──────────────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-fade-in {
+  animation: fadeIn 0.2s ease forwards;
+}
+
+/* ─── Notification badge pop ────────────────────────────────────────────── */
+@keyframes notificationPop {
+  0%   { transform: scale(0.5); opacity: 0; }
+  60%  { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1);   opacity: 1; }
+}
+.animate-notification-pop {
+  animation: notificationPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* ─── Thin scrollbar for notification list ──────────────────────────────── */
+.scrollbar-thin::-webkit-scrollbar { width: 4px; }
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.25);
+  border-radius: 9999px;
+}
+
