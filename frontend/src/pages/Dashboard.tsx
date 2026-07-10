@@ -434,13 +434,6 @@ export const Dashboard: React.FC = () => {
             <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center font-semibold text-primary">
               {user.full_name.charAt(0).toUpperCase()}
             </div>
-            <button
-              onClick={logout}
-              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive transition-all focus:outline-none"
-            >
-              <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline">Logout</span>
-            </button>
           </div>
         </header>
 
