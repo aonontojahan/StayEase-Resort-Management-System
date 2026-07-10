@@ -15,7 +15,7 @@ Follow these steps to run the StayEase project locally on your machine. The proj
 2. Activate your virtual environment:
    ```bash
    # On Windows:
-   .\.venv\Scripts\activate
+   source .venv/Scripts/activate
    ```
 3. Install dependencies:
    ```bash
