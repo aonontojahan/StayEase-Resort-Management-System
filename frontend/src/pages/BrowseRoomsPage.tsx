@@ -135,7 +135,7 @@ export const BrowseRoomsPage: React.FC = () => {
                   
                   <div className="p-5 flex-1 flex flex-col">
                     <div className="flex justify-between items-center mb-3">
-                      <p className="text-2xl font-bold text-primary">${room.room_type.base_price_per_night.toFixed(0)}<span className="text-sm text-muted-foreground font-normal">/night</span></p>
+                      <p className="text-2xl font-bold text-primary">TK {room.room_type.base_price_per_night.toFixed(0)}<span className="text-sm text-muted-foreground font-normal">/night</span></p>
                       <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground bg-muted px-2 py-1 rounded-md">
                         <Users className="h-3.5 w-3.5" /> Max {room.room_type.max_occupancy}
                       </span>

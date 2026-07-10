@@ -253,7 +253,7 @@ export const RoomsPage: React.FC = () => {
                     <td className="px-5 py-3.5 font-bold">{room.room_number}</td>
                     <td className="px-5 py-3.5">{room.room_type.name}</td>
                     <td className="px-5 py-3.5">{room.floor}</td>
-                    <td className="px-5 py-3.5">${room.room_type.base_price_per_night.toFixed(2)}</td>
+                    <td className="px-5 py-3.5">TK {room.room_type.base_price_per_night.toFixed(2)}</td>
                     <td className="px-5 py-3.5">
                       <span
                         className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
@@ -309,7 +309,7 @@ export const RoomsPage: React.FC = () => {
             <select {...createForm.register("room_type_id")} className="block w-full rounded-lg border bg-card py-2 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
               <option value="">Select a type...</option>
               {roomTypes.map((rt) => (
-                <option key={rt.id} value={rt.id}>{rt.name} — ${rt.base_price_per_night}/night</option>
+                <option key={rt.id} value={rt.id}>{rt.name} — TK {rt.base_price_per_night}/night</option>
               ))}
             </select>
             {createForm.formState.errors.room_type_id && <p className="text-[10px] text-destructive">{createForm.formState.errors.room_type_id.message}</p>}
@@ -384,7 +384,7 @@ export const RoomsPage: React.FC = () => {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-muted-foreground">Price / Night ($)</label>
+              <label className="text-xs font-semibold text-muted-foreground">Price / Night (TK)</label>
               <input {...typeForm.register("base_price_per_night")} type="number" step="0.01" className="block w-full rounded-lg border bg-card py-2 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" />
               {typeForm.formState.errors.base_price_per_night && <p className="text-[10px] text-destructive">{typeForm.formState.errors.base_price_per_night.message}</p>}
             </div>

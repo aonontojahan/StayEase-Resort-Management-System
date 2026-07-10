@@ -114,7 +114,7 @@ export const PaymentsPage: React.FC = () => {
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
             <DollarSign className="h-4 w-4 text-green-600" /> Total Revenue
           </p>
-          <h3 className="text-2xl font-bold">${totalRevenue.toFixed(2)}</h3>
+          <h3 className="text-2xl font-bold">TK {totalRevenue.toFixed(2)}</h3>
         </div>
         <div className="rounded-xl border bg-card p-5 shadow-sm space-y-2">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
@@ -163,7 +163,7 @@ export const PaymentsPage: React.FC = () => {
                   <tr key={p.id} className="border-b last:border-0 hover:bg-muted/20">
                     <td className="px-5 py-3.5 whitespace-nowrap">{new Date(p.created_at).toLocaleDateString()}</td>
                     <td className="px-5 py-3.5 font-mono text-xs">{p.booking.id.split("-")[0]}...</td>
-                    <td className="px-5 py-3.5 font-bold">${p.amount.toFixed(2)}</td>
+                    <td className="px-5 py-3.5 font-bold">TK {p.amount.toFixed(2)}</td>
                     <td className="px-5 py-3.5">
                       <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${METHOD_COLORS[p.payment_method] || "bg-gray-100"}`}>
                         {p.payment_method}
@@ -191,14 +191,14 @@ export const PaymentsPage: React.FC = () => {
             <select {...form.register("booking_id")} className="block w-full rounded-lg border bg-card py-2 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
               <option value="">Select booking...</option>
               {bookings.filter(b => b.status !== 'Cancelled').map((b) => (
-                <option key={b.id} value={b.id}>{b.guest.full_name} - {b.room.room_number} - Total: ${b.total_amount}</option>
+                <option key={b.id} value={b.id}>{b.guest.full_name} - {b.room.room_number} - Total: TK {b.total_amount}</option>
               ))}
             </select>
             {form.formState.errors.booking_id && <p className="text-[10px] text-destructive">{form.formState.errors.booking_id.message}</p>}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-muted-foreground">Amount ($)</label>
+              <label className="text-xs font-semibold text-muted-foreground">Amount (TK)</label>
               <input {...form.register("amount")} type="number" step="0.01" className="block w-full rounded-lg border bg-card py-2 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" />
               {form.formState.errors.amount && <p className="text-[10px] text-destructive">{form.formState.errors.amount.message}</p>}
             </div>

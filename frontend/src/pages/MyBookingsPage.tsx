@@ -112,7 +112,7 @@ export const MyBookingsPage: React.FC = () => {
               <div className="flex items-center justify-between pt-2 border-t">
                 <div>
                   <p className="text-xs text-muted-foreground">Total Amount</p>
-                  <p className="font-bold text-lg text-primary">${b.total_amount.toFixed(2)}</p>
+                  <p className="font-bold text-lg text-primary">TK {b.total_amount.toFixed(2)}</p>
                 </div>
                 
                 {b.status === "Pending" && (

@@ -65,7 +65,7 @@ export const PaymentHistoryPage: React.FC = () => {
                     {p.status === 'Completed' ? <CheckCircle className="h-6 w-6" /> : <Clock className="h-6 w-6" />}
                   </div>
                   <div>
-                    <h3 className="font-bold text-lg">${p.amount.toFixed(2)}</h3>
+                    <h3 className="font-bold text-lg">TK {p.amount.toFixed(2)}</h3>
                     <p className="text-sm text-muted-foreground">
                       {new Date(p.created_at).toLocaleDateString()} · {p.payment_method}
                     </p>

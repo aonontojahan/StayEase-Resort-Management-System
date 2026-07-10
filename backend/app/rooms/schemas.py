@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import date, datetime
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -45,7 +45,5 @@ class RoomRead(RoomBase):
     id: uuid.UUID
     status: str
     room_type: RoomTypeRead
-    created_at: str = None
-    updated_at: str = None
-
-    model_config = ConfigDict(from_attributes=True)
+    created_at: datetime
+    updated_at: datetime
