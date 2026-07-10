@@ -98,15 +98,6 @@ export const Login: React.FC = () => {
             </p>
           </div>
 
-          {/* Demo credentials hint */}
-          <div className="rounded-lg border border-border bg-secondary/50 p-4 space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Demo Accounts</p>
-            <div className="space-y-1 text-sm">
-              <p><span className="font-medium">Resort Owner:</span> <code className="bg-background px-1 rounded text-xs">aonontojahan@gmail.com</code> / <code className="bg-background px-1 rounded text-xs">aonontojahan</code></p>
-              <p><span className="font-medium">Guest:</span> <code className="bg-background px-1 rounded text-xs">guest@stayease.com</code> / <code className="bg-background px-1 rounded text-xs">guest123</code></p>
-            </div>
-          </div>
-
           {/* Form Content */}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             
