@@ -4,13 +4,13 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.audit.router import router as audit_router
 from app.auth.router import router as auth_router
 from app.rooms.router import router as rooms_router
 from app.bookings.router import router as bookings_router
 from app.housekeeping.router import router as housekeeping_router
 from app.payments.router import router as payments_router
 from app.reports.router import router as reports_router
+from app.invoices.router import router as invoices_router
 from app.core.config import settings
 from app.core.database import Base, engine, SessionLocal
 from app.core.exceptions import StayEaseException
@@ -19,12 +19,12 @@ from app.core.rate_limiter import RateLimitMiddleware, SlidingWindowRateLimiter
 from app.core.seeding import seed_db
 
 # Import all models so SQLAlchemy picks them up for create_all
-import app.audit.models  # noqa
 import app.auth.models  # noqa
 import app.rooms.models  # noqa
 import app.bookings.models  # noqa
 import app.housekeeping.models  # noqa
 import app.payments.models  # noqa
+import app.invoices.models  # noqa
 
 logger = logging.getLogger(__name__)
 
@@ -111,10 +111,10 @@ async def health_check():
 
 
 # Include all Routers
-app.include_router(audit_router, prefix=settings.API_V1_STR)
 app.include_router(auth_router, prefix=settings.API_V1_STR)
 app.include_router(rooms_router, prefix=settings.API_V1_STR)
 app.include_router(bookings_router, prefix=settings.API_V1_STR)
 app.include_router(housekeeping_router, prefix=settings.API_V1_STR)
 app.include_router(payments_router, prefix=settings.API_V1_STR)
 app.include_router(reports_router, prefix=settings.API_V1_STR)
+app.include_router(invoices_router, prefix=settings.API_V1_STR)

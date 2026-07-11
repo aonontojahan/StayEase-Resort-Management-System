@@ -29,23 +29,19 @@ async def list_tasks(
 ):
     repo = HousekeepingRepository(db)
     if current_user.role.name == "Housekeeping":
-        items = await repo.get_by_assigned(current_user.id, skip=pagination.skip, limit=pagination.limit)
+        items = await repo.get_by_assigned(
+            current_user.id, skip=pagination.skip, limit=pagination.limit
+        )
         total = await repo.count_by_assigned(current_user.id)
     else:
         items = await repo.get_all(skip=pagination.skip, limit=pagination.limit)
         total = await repo.count_all()
     return JSONResponse(
         content=jsonable_encoder([TaskRead.model_validate(t) for t in items]),
-        headers={"X-Total-Count": str(total), "Access-Control-Expose-Headers": "X-Total-Count"},
-    )
-        total = await repo.count_by_assigned(current_user.id)
-    else:
-        items = await repo.get_all(skip=pagination.skip, limit=pagination.limit)
-        total = await repo.count_all()
-    return Response(
-        content=TaskRead.model_validate(items, many=True).model_dump_json(),
-        media_type="application/json",
-        headers={"X-Total-Count": str(total)},
+        headers={
+            "X-Total-Count": str(total),
+            "Access-Control-Expose-Headers": "X-Total-Count",
+        },
     )
 
 

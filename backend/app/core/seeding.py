@@ -29,6 +29,8 @@ DEFAULT_PERMISSIONS = [
     ("housekeeping:write", "Assign and update cleaning tasks"),
     ("payments:read", "View payment details and history"),
     ("payments:write", "Process payments, deposits, and refunds"),
+    ("invoices:read", "View invoices and billing history"),
+    ("invoices:write", "Create and manage invoices"),
     ("reports:read", "Generate and export system reports"),
     ("settings:read", "Read resort configurations"),
     ("settings:write", "Modify resort configurations and system rules"),
@@ -46,6 +48,8 @@ ROLE_PERMISSION_MAP = {
         "housekeeping:write",
         "payments:read",
         "payments:write",
+        "invoices:read",
+        "invoices:write",
         "reports:read",
         "settings:read",
     ],
@@ -57,6 +61,7 @@ ROLE_PERMISSION_MAP = {
         "housekeeping:read",
         "payments:read",
         "payments:write",
+        "invoices:read",
     ],
     "Housekeeping": [
         "rooms:read",
@@ -66,6 +71,8 @@ ROLE_PERMISSION_MAP = {
     "Accountant": [
         "payments:read",
         "payments:write",
+        "invoices:read",
+        "invoices:write",
         "reports:read",
     ],
     "Guest": [
@@ -74,6 +81,7 @@ ROLE_PERMISSION_MAP = {
         "bookings:read",
         "bookings:write",
         "payments:read",
+        "invoices:read",
     ],
 }
 

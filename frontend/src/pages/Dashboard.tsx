@@ -4,7 +4,7 @@ import { api } from "@/services/api"
 import { OccupancyReport, BookingsSummary } from "@/types/api"
 import { 
   Loader2, 
-  Home, BookOpen, BedDouble, Users, Sparkles, CreditCard, Menu, X
+  Home, BookOpen, BedDouble, Users, Sparkles, CreditCard, FileText, Menu, X
 } from "lucide-react"
 
 import { StaffManagement } from "@/components/StaffManagement"
@@ -14,6 +14,7 @@ import { GuestsPage } from "@/pages/GuestsPage"
 import { HousekeepingPage } from "@/pages/HousekeepingPage"
 import { PaymentsPage } from "@/pages/PaymentsPage"
 import { AccountantPage } from "@/pages/AccountantPage"
+import { InvoicesPage } from "@/pages/InvoicesPage"
 import { MyBookingsPage } from "@/pages/MyBookingsPage"
 import { BrowseRoomsPage } from "@/pages/BrowseRoomsPage"
 import { PaymentHistoryPage } from "@/pages/PaymentHistoryPage"
@@ -114,6 +115,10 @@ export const Dashboard: React.FC = () => {
             <CreditCard className="h-4 w-4" />
             <span>Payments</span>
           </button>
+          <button onClick={() => handleTabChange("Invoices")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Invoices" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
+            <FileText className="h-4 w-4" />
+            <span>Invoices</span>
+          </button>
         </>
       ) : user.role.name === "Guest" ? (
         <>
@@ -129,6 +134,10 @@ export const Dashboard: React.FC = () => {
             <CreditCard className="h-4 w-4" />
             <span>Payment History</span>
           </button>
+          <button onClick={() => handleTabChange("Invoices")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Invoices" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
+            <FileText className="h-4 w-4" />
+            <span>Invoices</span>
+          </button>
         </>
       ) : user.role.name === "Housekeeping" ? (
         <>
@@ -142,6 +151,10 @@ export const Dashboard: React.FC = () => {
           <button onClick={() => handleTabChange("Payments")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Payments" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
             <CreditCard className="h-4 w-4" />
             <span>Payments</span>
+          </button>
+          <button onClick={() => handleTabChange("Invoices")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Invoices" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
+            <FileText className="h-4 w-4" />
+            <span>Invoices</span>
           </button>
         </>
       ) : null}
@@ -157,6 +170,7 @@ export const Dashboard: React.FC = () => {
       case "Guests": return <GuestsPage />
       case "Housekeeping": return <HousekeepingPage />
       case "Payments": return user.role.name === "Accountant" ? <AccountantPage /> : <PaymentsPage />
+      case "Invoices": return <InvoicesPage />
       case "Settings":
         return (
           <div className="space-y-6 max-w-2xl">

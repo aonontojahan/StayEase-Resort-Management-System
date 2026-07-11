@@ -6,14 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from app.audit.service import AuditService
 from app.auth.dependencies import get_current_user, require_role
 from app.auth.models import User
-from app.auth.repository import RoleRepository, UserRepository, TokenBlacklistRepository
+from app.auth.repository import RoleRepository, UserRepository
 from app.core.exceptions import ForbiddenException, BadRequestException
 from app.core.pagination import PaginationParams
-from app.core.security import get_password_hash, decode_token
-from app.auth.models import User
+from app.core.security import get_password_hash
 from app.auth.schemas import (
     ChangePasswordRequest,
     LoginRequest,
@@ -160,8 +158,6 @@ async def list_users(
         .limit(pagination.limit)
     )
     users = result.scalars().all()
-    from app.auth.repository import UserRepository
-
     user_repo = UserRepository(db)
     total = await user_repo.count()
     return JSONResponse(

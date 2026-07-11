@@ -12,6 +12,8 @@ from app.bookings.models import BookingStatus
 from app.bookings.repository import BookingRepository
 from app.bookings.schemas import BookingCreate, BookingRead, BookingStatusUpdate
 from app.core.database import get_db
+from app.invoices.schemas import InvoiceCreate, InvoiceItemCreate
+from app.invoices.repository import InvoiceRepository
 from app.core.exceptions import (
     BadRequestException,
     ForbiddenException,
@@ -56,10 +58,12 @@ async def list_my_bookings(
         current_user.id, skip=pagination.skip, limit=pagination.limit
     )
     total = await repo.count_by_guest(current_user.id)
-    return Response(
-        content=BookingRead.model_validate(items, many=True).model_dump_json(),
-        media_type="application/json",
-        headers={"X-Total-Count": str(total)},
+    return JSONResponse(
+        content=jsonable_encoder([BookingRead.model_validate(b) for b in items]),
+        headers={
+            "X-Total-Count": str(total),
+            "Access-Control-Expose-Headers": "X-Total-Count",
+        },
     )
 
 
@@ -107,6 +111,24 @@ async def create_booking(
     guest_id = current_user.id
 
     booking = await booking_repo.create(data, guest_id, current_user.id, total_amount)
+
+    invoice_data = InvoiceCreate(
+        booking_id=booking.id,
+        due_date=data.check_in_date,
+        subtotal=total_amount,
+        tax_rate=0,
+        items=[
+            InvoiceItemCreate(
+                description=f"{room.room_type.name} x {nights} nights",
+                quantity=nights,
+                unit_price=float(room.room_type.base_price_per_night),
+                amount=total_amount,
+            )
+        ],
+    )
+    invoice_repo = InvoiceRepository(db)
+    await invoice_repo.create(invoice_data, guest_id)
+
     return booking
 
 

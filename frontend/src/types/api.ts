@@ -184,3 +184,39 @@ export interface RevenueReport {
   revenue: number
   count: number
 }
+
+// ── Invoices ──────────────────────────────────────────────────────────────
+export interface InvoiceItem {
+  id: string
+  description: string
+  quantity: number
+  unit_price: number
+  amount: number
+}
+
+export interface Invoice {
+  id: string
+  invoice_number: string
+  booking_id: string
+  guest_id: string
+  issue_date: string
+  due_date: string
+  subtotal: number
+  tax_rate: number
+  tax_amount: number
+  total_amount: number
+  status: "Draft" | "Issued" | "Paid" | "Cancelled" | "Refunded"
+  notes: string | null
+  created_at: string
+  updated_at: string
+  items: InvoiceItem[]
+}
+
+export interface InvoiceSummary {
+  total_invoices: number
+  total_paid: number
+  total_unpaid: number
+  total_cancelled: number
+  paid_count: number
+  unpaid_count: number
+}

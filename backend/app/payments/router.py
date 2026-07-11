@@ -17,12 +17,10 @@ from app.core.email import send_html_email, get_booking_confirmation_html
 from app.core.exceptions import BadRequestException, NotFoundException
 from app.core.pagination import PaginationParams
 from app.payments.repository import PaymentRepository
-from app.payments.models import PaymentMethod, PaymentStatus
 from app.payments.schemas import (
     PaymentCreate,
     PaymentRead,
     RevenueSummary,
-    PaymentStatusUpdate,
     StripeIntentCreate,
     StripePaymentConfirm,
 )
@@ -69,24 +67,6 @@ async def list_my_payments(
             "X-Total-Count": str(total),
             "Access-Control-Expose-Headers": "X-Total-Count",
         },
-    )
-
-
-@router.get("/my", response_model=List[PaymentRead])
-async def list_my_payments(
-    pagination: PaginationParams = Depends(),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    repo = PaymentRepository(db)
-    items = await repo.get_by_guest(
-        current_user.id, skip=pagination.skip, limit=pagination.limit
-    )
-    total = await repo.count_by_guest(current_user.id)
-    return Response(
-        content=PaymentRead.model_validate(items, many=True).model_dump_json(),
-        media_type="application/json",
-        headers={"X-Total-Count": str(total)},
     )
 
 
