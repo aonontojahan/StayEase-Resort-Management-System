@@ -48,6 +48,12 @@ class Booking(Base):
     room: Mapped["Room"] = relationship("Room", back_populates="bookings", lazy="selectin")
     payments: Mapped[List["Payment"]] = relationship("Payment", back_populates="booking")
 
+    @property
+    def paid_amount(self) -> float:
+        if not self.payments:
+            return 0.0
+        return sum(float(p.amount) for p in self.payments if p.status == "Completed")
+
     def __repr__(self) -> str:
         return f"<Booking(id={self.id}, guest={self.guest_id}, room={self.room_id}, status={self.status})>"
 

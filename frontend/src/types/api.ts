@@ -17,6 +17,7 @@ export interface Room {
   notes: string | null
   room_type: RoomType
   room_type_id?: string
+  is_available?: boolean
   created_at: string
   updated_at: string
 }
@@ -75,6 +76,7 @@ export interface Booking {
   status: "Pending" | "Confirmed" | "CheckedIn" | "CheckedOut" | "Cancelled"
   special_requests: string | null
   total_amount: number
+  paid_amount: number
   guest: GuestSimple
   room: RoomSimple
   created_at: string

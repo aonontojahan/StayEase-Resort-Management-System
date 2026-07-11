@@ -47,3 +47,15 @@ class RevenueSummary(BaseModel):
 
 class PaymentStatusUpdate(BaseModel):
     status: str
+
+
+class StripeIntentCreate(BaseModel):
+    booking_id: uuid.UUID
+    amount_type: str  # "full" or "deposit"
+
+
+class StripePaymentConfirm(BaseModel):
+    booking_id: uuid.UUID
+    payment_intent_id: str
+    amount_type: str  # "full" or "deposit"
+

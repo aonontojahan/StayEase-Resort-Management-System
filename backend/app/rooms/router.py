@@ -97,6 +97,26 @@ async def list_available_rooms(
     return await repo.get_available(check_in, check_out)
 
 
+@router.get("/rooms/with-availability", response_model=List[RoomRead])
+async def list_rooms_with_availability(
+    check_in: date,
+    check_out: date,
+    _: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return all rooms, marked with whether they are available for the given dates."""
+    if check_out <= check_in:
+        raise BadRequestException("Check-out date must be after check-in date.")
+    repo = RoomRepository(db)
+    all_rooms = await repo.get_all()
+    available_rooms = await repo.get_available(check_in, check_out)
+    available_ids = {r.id for r in available_rooms}
+    for r in all_rooms:
+        r.is_available = r.id in available_ids
+    return all_rooms
+
+
+
 @router.get("/rooms/{room_id}", response_model=RoomRead)
 async def get_room(
     room_id: uuid.UUID,

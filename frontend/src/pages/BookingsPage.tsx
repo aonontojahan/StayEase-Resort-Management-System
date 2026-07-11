@@ -166,7 +166,17 @@ export const BookingsPage: React.FC = () => {
                     <td className="px-5 py-3.5">{b.check_in_date}</td>
                     <td className="px-5 py-3.5">{b.check_out_date}</td>
                     <td className="px-5 py-3.5">{nightCount(b)}</td>
-                    <td className="px-5 py-3.5 font-semibold">TK {b.total_amount.toFixed(2)}</td>
+                    <td className="px-5 py-3.5">
+                      <p className="font-semibold">TK {b.total_amount.toFixed(2)}</p>
+                      <div className="text-[10px] text-muted-foreground mt-0.5 space-y-0.5">
+                        <p>Paid: <span className="text-emerald-600 font-medium">TK {b.paid_amount.toFixed(2)}</span></p>
+                        {b.total_amount - b.paid_amount > 0 ? (
+                          <p>Due: <span className="text-destructive font-medium">TK {(b.total_amount - b.paid_amount).toFixed(2)}</span></p>
+                        ) : (
+                          <p className="text-emerald-600 font-semibold uppercase text-[8px] tracking-wide">Paid</p>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-5 py-3.5">
                       <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_COLORS[b.status] || "bg-gray-100 text-gray-700"}`}>
                         {b.status}

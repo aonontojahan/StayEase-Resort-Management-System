@@ -21,6 +21,7 @@ class BookingRepository:
                 selectinload(Booking.guest),
                 selectinload(Booking.room).selectinload(Room.room_type),
                 selectinload(Booking.created_by),
+                selectinload(Booking.payments),
             )
             .order_by(Booking.created_at.desc())
         )
@@ -34,6 +35,7 @@ class BookingRepository:
                 selectinload(Booking.guest),
                 selectinload(Booking.room).selectinload(Room.room_type),
                 selectinload(Booking.created_by),
+                selectinload(Booking.payments),
             )
         )
         return result.scalar_one_or_none()
@@ -45,6 +47,7 @@ class BookingRepository:
             .options(
                 selectinload(Booking.guest),
                 selectinload(Booking.room).selectinload(Room.room_type),
+                selectinload(Booking.payments),
             )
             .order_by(Booking.created_at.desc())
         )
@@ -66,7 +69,7 @@ class BookingRepository:
         result = await self.db.execute(query)
         return result.scalar_one_or_none() is not None
 
-    async def create(self, data: BookingCreate, guest_id: uuid.UUID, created_by_id: uuid.UUID, total_amount: float) -> Booking:
+    async def create(self, data: BookingCreate, guest_id: uuid.UUID, created_by_id: uuid.UUID, total_amount: float, status: BookingStatus = BookingStatus.pending) -> Booking:
         booking = Booking(
             guest_id=guest_id,
             created_by_id=created_by_id,
@@ -76,7 +79,7 @@ class BookingRepository:
             num_guests=data.num_guests,
             special_requests=data.special_requests,
             total_amount=total_amount,
-            status=BookingStatus.confirmed,
+            status=status,
         )
         self.db.add(booking)
         await self.db.flush()

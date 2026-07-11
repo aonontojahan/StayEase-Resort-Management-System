@@ -45,5 +45,7 @@ class RoomRead(RoomBase):
     id: uuid.UUID
     status: str
     room_type: RoomTypeRead
+    is_available: Optional[bool] = None
     created_at: datetime
     updated_at: datetime
+

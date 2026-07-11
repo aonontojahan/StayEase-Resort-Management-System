@@ -49,7 +49,9 @@ class BookingRead(BaseModel):
     status: str
     special_requests: Optional[str] = None
     total_amount: float
+    paid_amount: float
     guest: GuestRead
     room: RoomSimple
     created_at: datetime
     updated_at: datetime
+
