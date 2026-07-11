@@ -2,6 +2,8 @@ import uuid
 from typing import List
 
 from fastapi import APIRouter, Depends, status
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user, require_role
@@ -10,32 +12,55 @@ from app.bookings.models import BookingStatus
 from app.bookings.repository import BookingRepository
 from app.bookings.schemas import BookingCreate, BookingRead, BookingStatusUpdate
 from app.core.database import get_db
-from app.core.exceptions import BadRequestException, ForbiddenException, NotFoundException
+from app.core.exceptions import (
+    BadRequestException,
+    ForbiddenException,
+    NotFoundException,
+)
+from app.core.pagination import PaginationParams
 from app.rooms.repository import RoomRepository
 
 router = APIRouter(prefix="/bookings", tags=["Bookings"])
 
-STAFF_ROLES = ["Super Admin", "Resort Owner", "Manager", "Receptionist", "Accountant"]
+STAFF_ROLES = ["Resort Owner", "Manager", "Receptionist", "Accountant"]
 
 
 @router.get("/", response_model=List[BookingRead])
 async def list_all_bookings(
+    pagination: PaginationParams = Depends(),
     current_user: User = require_role(STAFF_ROLES),
     db: AsyncSession = Depends(get_db),
 ):
-    """List all bookings — staff only."""
     repo = BookingRepository(db)
-    return await repo.get_all()
+    items = await repo.get_by_guest(
+        current_user.id, skip=pagination.skip, limit=pagination.limit
+    )
+    total = await repo.count_by_guest(current_user.id)
+    return JSONResponse(
+        content=jsonable_encoder([BookingRead.model_validate(b) for b in items]),
+        headers={
+            "X-Total-Count": str(total),
+            "Access-Control-Expose-Headers": "X-Total-Count",
+        },
+    )
 
 
 @router.get("/my", response_model=List[BookingRead])
 async def list_my_bookings(
+    pagination: PaginationParams = Depends(),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Return the current guest's own bookings."""
     repo = BookingRepository(db)
-    return await repo.get_by_guest(current_user.id)
+    items = await repo.get_by_guest(
+        current_user.id, skip=pagination.skip, limit=pagination.limit
+    )
+    total = await repo.count_by_guest(current_user.id)
+    return Response(
+        content=BookingRead.model_validate(items, many=True).model_dump_json(),
+        media_type="application/json",
+        headers={"X-Total-Count": str(total)},
+    )
 
 
 @router.get("/{booking_id}", response_model=BookingRead)
@@ -44,7 +69,6 @@ async def get_booking(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get a single booking. Guests can only view their own."""
     repo = BookingRepository(db)
     booking = await repo.get_by_id(booking_id)
     if not booking:
@@ -60,7 +84,6 @@ async def create_booking(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a new booking. Guests book for themselves; staff can book for any guest."""
     if data.check_out_date <= data.check_in_date:
         raise BadRequestException("Check-out must be after check-in.")
 
@@ -72,15 +95,15 @@ async def create_booking(
         raise BadRequestException("Room is under maintenance and cannot be booked.")
 
     booking_repo = BookingRepository(db)
-    conflict = await booking_repo.has_conflict(data.room_id, data.check_in_date, data.check_out_date)
+    conflict = await booking_repo.has_conflict(
+        data.room_id, data.check_in_date, data.check_out_date
+    )
     if conflict:
         raise BadRequestException("Room is not available for the selected dates.")
 
-    # Calculate total
     nights = (data.check_out_date - data.check_in_date).days
     total_amount = float(room.room_type.base_price_per_night) * nights
 
-    # Guest books for themselves; staff creates on behalf of a guest (guest_id = current_user for simplicity)
     guest_id = current_user.id
 
     booking = await booking_repo.create(data, guest_id, current_user.id, total_amount)
@@ -94,7 +117,6 @@ async def update_booking_status(
     current_user: User = require_role(STAFF_ROLES),
     db: AsyncSession = Depends(get_db),
 ):
-    """Update booking status (CheckIn, CheckOut, Cancel, etc.)."""
     try:
         new_status = BookingStatus(body.status)
     except ValueError:
@@ -106,7 +128,6 @@ async def update_booking_status(
     if not booking:
         raise NotFoundException("Booking not found.")
 
-    # Room status sync
     room_repo = RoomRepository(db)
     room = await room_repo.get_by_id(booking.room_id)
     if room:
@@ -124,7 +145,6 @@ async def delete_booking(
     _: User = require_role(["Resort Owner", "Manager"]),
     db: AsyncSession = Depends(get_db),
 ):
-    """Delete a booking."""
     repo = BookingRepository(db)
     booking = await repo.get_by_id(booking_id)
     if not booking:

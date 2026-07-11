@@ -1,7 +1,7 @@
 import uuid
 from datetime import date
 from typing import Optional, Sequence
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,7 +14,7 @@ class BookingRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_all(self) -> Sequence[Booking]:
+    async def get_all(self, skip: int = 0, limit: int = 100) -> Sequence[Booking]:
         result = await self.db.execute(
             select(Booking)
             .options(
@@ -24,8 +24,14 @@ class BookingRepository:
                 selectinload(Booking.payments),
             )
             .order_by(Booking.created_at.desc())
+            .offset(skip)
+            .limit(limit)
         )
         return result.scalars().all()
+
+    async def count_all(self) -> int:
+        result = await self.db.execute(select(func.count(Booking.id)))
+        return int(result.scalar() or 0)
 
     async def get_by_id(self, booking_id: uuid.UUID) -> Optional[Booking]:
         result = await self.db.execute(
@@ -40,7 +46,9 @@ class BookingRepository:
         )
         return result.scalar_one_or_none()
 
-    async def get_by_guest(self, guest_id: uuid.UUID) -> Sequence[Booking]:
+    async def get_by_guest(
+        self, guest_id: uuid.UUID, skip: int = 0, limit: int = 100
+    ) -> Sequence[Booking]:
         result = await self.db.execute(
             select(Booking)
             .where(Booking.guest_id == guest_id)
@@ -50,26 +58,43 @@ class BookingRepository:
                 selectinload(Booking.payments),
             )
             .order_by(Booking.created_at.desc())
+            .offset(skip)
+            .limit(limit)
         )
         return result.scalars().all()
 
-    async def has_conflict(self, room_id: uuid.UUID, check_in: date, check_out: date, exclude_id: Optional[uuid.UUID] = None) -> bool:
-        """Return True if there's an overlapping active booking for the room."""
-        query = (
-            select(Booking)
-            .where(
-                Booking.room_id == room_id,
-                Booking.status.in_([BookingStatus.confirmed, BookingStatus.checked_in]),
-                Booking.check_in_date < check_out,
-                Booking.check_out_date > check_in,
-            )
+    async def count_by_guest(self, guest_id: uuid.UUID) -> int:
+        result = await self.db.execute(
+            select(func.count(Booking.id)).where(Booking.guest_id == guest_id)
+        )
+        return int(result.scalar() or 0)
+
+    async def has_conflict(
+        self,
+        room_id: uuid.UUID,
+        check_in: date,
+        check_out: date,
+        exclude_id: Optional[uuid.UUID] = None,
+    ) -> bool:
+        query = select(Booking).where(
+            Booking.room_id == room_id,
+            Booking.status.in_([BookingStatus.confirmed, BookingStatus.checked_in]),
+            Booking.check_in_date < check_out,
+            Booking.check_out_date > check_in,
         )
         if exclude_id:
             query = query.where(Booking.id != exclude_id)
         result = await self.db.execute(query)
         return result.scalar_one_or_none() is not None
 
-    async def create(self, data: BookingCreate, guest_id: uuid.UUID, created_by_id: uuid.UUID, total_amount: float, status: BookingStatus = BookingStatus.pending) -> Booking:
+    async def create(
+        self,
+        data: BookingCreate,
+        guest_id: uuid.UUID,
+        created_by_id: uuid.UUID,
+        total_amount: float,
+        status: BookingStatus = BookingStatus.pending,
+    ) -> Booking:
         booking = Booking(
             guest_id=guest_id,
             created_by_id=created_by_id,
@@ -85,7 +110,9 @@ class BookingRepository:
         await self.db.flush()
         return await self.get_by_id(booking.id)
 
-    async def update_status(self, booking: Booking, new_status: BookingStatus) -> Booking:
+    async def update_status(
+        self, booking: Booking, new_status: BookingStatus
+    ) -> Booking:
         booking.status = new_status
         self.db.add(booking)
         await self.db.flush()

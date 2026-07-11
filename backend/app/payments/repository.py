@@ -13,7 +13,7 @@ class PaymentRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_all(self) -> Sequence[Payment]:
+    async def get_all(self, skip: int = 0, limit: int = 100) -> Sequence[Payment]:
         result = await self.db.execute(
             select(Payment)
             .options(
@@ -21,8 +21,14 @@ class PaymentRepository:
                 selectinload(Payment.recorded_by),
             )
             .order_by(Payment.created_at.desc())
+            .offset(skip)
+            .limit(limit)
         )
         return result.scalars().all()
+
+    async def count_all(self) -> int:
+        result = await self.db.execute(select(func.count(Payment.id)))
+        return int(result.scalar() or 0)
 
     async def get_by_booking(self, booking_id: uuid.UUID) -> Sequence[Payment]:
         result = await self.db.execute(
@@ -36,7 +42,9 @@ class PaymentRepository:
         )
         return result.scalars().all()
 
-    async def get_by_guest(self, guest_id: uuid.UUID) -> Sequence[Payment]:
+    async def get_by_guest(
+        self, guest_id: uuid.UUID, skip: int = 0, limit: int = 100
+    ) -> Sequence[Payment]:
         result = await self.db.execute(
             select(Payment)
             .join(Booking, Payment.booking_id == Booking.id)
@@ -46,8 +54,18 @@ class PaymentRepository:
                 selectinload(Payment.recorded_by),
             )
             .order_by(Payment.created_at.desc())
+            .offset(skip)
+            .limit(limit)
         )
         return result.scalars().all()
+
+    async def count_by_guest(self, guest_id: uuid.UUID) -> int:
+        result = await self.db.execute(
+            select(func.count(Payment.id))
+            .join(Booking, Payment.booking_id == Booking.id)
+            .where(Booking.guest_id == guest_id)
+        )
+        return int(result.scalar() or 0)
 
     async def get_by_id(self, payment_id: uuid.UUID) -> Optional[Payment]:
         result = await self.db.execute(
@@ -76,16 +94,18 @@ class PaymentRepository:
 
     async def get_revenue_summary(self) -> RevenueSummary:
         total_result = await self.db.execute(
-            select(func.sum(Payment.amount), func.count(Payment.id))
-            .where(Payment.status == PaymentStatus.completed)
+            select(func.sum(Payment.amount), func.count(Payment.id)).where(
+                Payment.status == PaymentStatus.completed
+            )
         )
         total_row = total_result.one()
         completed = float(total_row[0] or 0)
         total_count = int(total_row[1] or 0)
 
         refund_result = await self.db.execute(
-            select(func.sum(Payment.amount))
-            .where(Payment.status == PaymentStatus.refunded)
+            select(func.sum(Payment.amount)).where(
+                Payment.status == PaymentStatus.refunded
+            )
         )
         refunded = float(refund_result.scalar() or 0)
 

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional, Sequence
-from sqlalchemy import select
+from typing import Optional, Sequence
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,7 +13,9 @@ class HousekeepingRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_all(self) -> Sequence[HousekeepingTask]:
+    async def get_all(
+        self, skip: int = 0, limit: int = 100
+    ) -> Sequence[HousekeepingTask]:
         result = await self.db.execute(
             select(HousekeepingTask)
             .options(
@@ -22,10 +24,18 @@ class HousekeepingRepository:
                 selectinload(HousekeepingTask.created_by),
             )
             .order_by(HousekeepingTask.created_at.desc())
+            .offset(skip)
+            .limit(limit)
         )
         return result.scalars().all()
 
-    async def get_by_assigned(self, user_id: uuid.UUID) -> Sequence[HousekeepingTask]:
+    async def count_all(self) -> int:
+        result = await self.db.execute(select(func.count(HousekeepingTask.id)))
+        return int(result.scalar() or 0)
+
+    async def get_by_assigned(
+        self, user_id: uuid.UUID, skip: int = 0, limit: int = 100
+    ) -> Sequence[HousekeepingTask]:
         result = await self.db.execute(
             select(HousekeepingTask)
             .where(HousekeepingTask.assigned_to_id == user_id)
@@ -35,8 +45,18 @@ class HousekeepingRepository:
                 selectinload(HousekeepingTask.created_by),
             )
             .order_by(HousekeepingTask.created_at.desc())
+            .offset(skip)
+            .limit(limit)
         )
         return result.scalars().all()
+
+    async def count_by_assigned(self, user_id: uuid.UUID) -> int:
+        result = await self.db.execute(
+            select(func.count(HousekeepingTask.id)).where(
+                HousekeepingTask.assigned_to_id == user_id
+            )
+        )
+        return int(result.scalar() or 0)
 
     async def get_by_id(self, task_id: uuid.UUID) -> Optional[HousekeepingTask]:
         result = await self.db.execute(
@@ -50,7 +70,9 @@ class HousekeepingRepository:
         )
         return result.scalar_one_or_none()
 
-    async def create(self, data: TaskCreate, created_by_id: uuid.UUID) -> HousekeepingTask:
+    async def create(
+        self, data: TaskCreate, created_by_id: uuid.UUID
+    ) -> HousekeepingTask:
         task = HousekeepingTask(
             room_id=data.room_id,
             assigned_to_id=data.assigned_to_id,
@@ -64,7 +86,9 @@ class HousekeepingRepository:
         await self.db.flush()
         return await self.get_by_id(task.id)
 
-    async def update_status(self, task: HousekeepingTask, new_status: TaskStatus) -> HousekeepingTask:
+    async def update_status(
+        self, task: HousekeepingTask, new_status: TaskStatus
+    ) -> HousekeepingTask:
         task.status = new_status
         if new_status == TaskStatus.done:
             task.completed_at = datetime.now(timezone.utc)

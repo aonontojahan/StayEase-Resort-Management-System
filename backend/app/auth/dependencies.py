@@ -5,12 +5,11 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import User
-from app.auth.repository import UserRepository
+from app.auth.repository import TokenBlacklistRepository, UserRepository
 from app.core.database import get_db
 from app.core.exceptions import ForbiddenException, UnauthorizedException
 from app.core.security import decode_token
 
-# Scheme for parsing bearer token
 security_scheme = HTTPBearer(auto_error=False)
 
 
@@ -18,7 +17,6 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    """FastAPI dependency to retrieve the currently authenticated user from JWT token."""
     if not credentials:
         raise UnauthorizedException("Not authenticated")
 
@@ -26,6 +24,12 @@ async def get_current_user(
     payload = decode_token(token)
     if not payload or payload.get("type") != "access":
         raise UnauthorizedException("Invalid or expired authentication token")
+
+    token_jti = payload.get("jti")
+    if token_jti:
+        blacklist_repo = TokenBlacklistRepository(db)
+        if await blacklist_repo.is_blacklisted(token_jti):
+            raise UnauthorizedException("Token has been revoked")
 
     user_id_str = payload.get("sub")
     if not user_id_str:
@@ -48,7 +52,6 @@ async def get_current_user(
 
 
 class RoleChecker:
-    """Route dependency creator for role-based access control."""
     def __init__(self, allowed_roles: List[str]):
         self.allowed_roles = allowed_roles
 
@@ -61,7 +64,6 @@ class RoleChecker:
 
 
 class PermissionChecker:
-    """Route dependency creator for permission-based access control."""
     def __init__(self, required_permissions: List[str]):
         self.required_permissions = required_permissions
 
@@ -69,19 +71,15 @@ class PermissionChecker:
         user_permissions = {p.name for p in current_user.role.permissions}
         for perm in self.required_permissions:
             if perm not in user_permissions:
-                raise ForbiddenException(
-                    f"Missing required permission: {perm}"
-                )
+                raise ForbiddenException(f"Missing required permission: {perm}")
         return current_user
 
 
 def require_role(roles: Union[str, List[str]]):
-    """Convenience function to restrict route access by role."""
     allowed_list = [roles] if isinstance(roles, str) else roles
     return Depends(RoleChecker(allowed_list))
 
 
 def require_permission(permissions: Union[str, List[str]]):
-    """Convenience function to restrict route access by granular permission."""
     required_list = [permissions] if isinstance(permissions, str) else permissions
     return Depends(PermissionChecker(required_list))

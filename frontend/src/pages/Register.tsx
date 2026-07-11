@@ -10,7 +10,13 @@ const registerSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   full_name: z.string().min(2, "Full name must be at least 2 characters"),
   phone_number: z.string().optional().or(z.literal("")),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .regex(/[a-z]/, "Must contain a lowercase letter")
+    .regex(/[A-Z]/, "Must contain an uppercase letter")
+    .regex(/[0-9]/, "Must contain a number")
+    .regex(/[!@#$%^&*()_\-+=<>?/{}~|]/, "Must contain a special character"),
 })
 
 type RegisterFormValues = z.infer<typeof registerSchema>

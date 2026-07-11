@@ -3,38 +3,49 @@ from datetime import date
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, status
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user, require_role
 from app.auth.models import User
 from app.core.database import get_db
-from app.core.exceptions import BadRequestException, ForbiddenException, NotFoundException
+from app.core.exceptions import (
+    BadRequestException,
+    ForbiddenException,
+    NotFoundException,
+)
+from app.core.pagination import PaginationParams
 from app.rooms.models import Room, RoomType
 from app.rooms.repository import RoomRepository, RoomTypeRepository
-from app.rooms.schemas import RoomCreate, RoomRead, RoomTypeCreate, RoomTypeRead, RoomUpdate
+from app.rooms.schemas import (
+    RoomCreate,
+    RoomRead,
+    RoomTypeCreate,
+    RoomTypeRead,
+    RoomUpdate,
+)
 
 router = APIRouter(tags=["Rooms"])
 
-
-# ── Room Types ──────────────────────────────────────────────────────────────
 
 @router.get("/room-types", response_model=List[RoomTypeRead])
 async def list_room_types(
     _: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """List all room types."""
     repo = RoomTypeRepository(db)
     return await repo.get_all()
 
 
-@router.post("/room-types", response_model=RoomTypeRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/room-types", response_model=RoomTypeRead, status_code=status.HTTP_201_CREATED
+)
 async def create_room_type(
     data: RoomTypeCreate,
     _: User = require_role(["Resort Owner", "Manager"]),
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a new room type."""
     repo = RoomTypeRepository(db)
     existing = await repo.get_by_name(data.name)
     if existing:
@@ -49,7 +60,6 @@ async def update_room_type(
     _: User = require_role(["Resort Owner", "Manager"]),
     db: AsyncSession = Depends(get_db),
 ):
-    """Update a room type."""
     repo = RoomTypeRepository(db)
     rt = await repo.get_by_id(room_type_id)
     if not rt:
@@ -63,7 +73,6 @@ async def delete_room_type(
     _: User = require_role(["Resort Owner"]),
     db: AsyncSession = Depends(get_db),
 ):
-    """Delete a room type."""
     repo = RoomTypeRepository(db)
     rt = await repo.get_by_id(room_type_id)
     if not rt:
@@ -71,16 +80,22 @@ async def delete_room_type(
     await repo.delete(rt)
 
 
-# ── Rooms ────────────────────────────────────────────────────────────────────
-
 @router.get("/rooms", response_model=List[RoomRead])
 async def list_rooms(
+    pagination: PaginationParams = Depends(),
     _: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """List all rooms."""
     repo = RoomRepository(db)
-    return await repo.get_all()
+    items = await repo.get_all(skip=pagination.skip, limit=pagination.limit)
+    total = await repo.count_all()
+    return JSONResponse(
+        content=jsonable_encoder([RoomRead.model_validate(r) for r in items]),
+        headers={
+            "X-Total-Count": str(total),
+            "Access-Control-Expose-Headers": "X-Total-Count",
+        },
+    )
 
 
 @router.get("/rooms/available", response_model=List[RoomRead])
@@ -90,7 +105,6 @@ async def list_available_rooms(
     _: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Return rooms available for the given date range."""
     if check_out <= check_in:
         raise BadRequestException("Check-out date must be after check-in date.")
     repo = RoomRepository(db)
@@ -104,7 +118,6 @@ async def list_rooms_with_availability(
     _: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Return all rooms, marked with whether they are available for the given dates."""
     if check_out <= check_in:
         raise BadRequestException("Check-out date must be after check-in date.")
     repo = RoomRepository(db)
@@ -116,14 +129,12 @@ async def list_rooms_with_availability(
     return all_rooms
 
 
-
 @router.get("/rooms/{room_id}", response_model=RoomRead)
 async def get_room(
     room_id: uuid.UUID,
     _: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get a single room by ID."""
     repo = RoomRepository(db)
     room = await repo.get_by_id(room_id)
     if not room:
@@ -137,7 +148,6 @@ async def create_room(
     _: User = require_role(["Resort Owner", "Manager"]),
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a new room."""
     repo = RoomRepository(db)
     existing = await repo.get_by_number(data.room_number)
     if existing:
@@ -153,12 +163,13 @@ async def update_room(
     _: User = require_role(["Resort Owner", "Manager"]),
     db: AsyncSession = Depends(get_db),
 ):
-    """Update a room."""
     repo = RoomRepository(db)
     room = await repo.get_by_id(room_id)
     if not room:
         raise NotFoundException("Room not found.")
-    updated = await repo.update(room, data.model_dump(exclude_none=True, exclude_unset=True))
+    updated = await repo.update(
+        room, data.model_dump(exclude_none=True, exclude_unset=True)
+    )
     return await repo.get_by_id(updated.id)
 
 
@@ -168,7 +179,6 @@ async def delete_room(
     _: User = require_role(["Resort Owner", "Manager"]),
     db: AsyncSession = Depends(get_db),
 ):
-    """Delete a room."""
     repo = RoomRepository(db)
     room = await repo.get_by_id(room_id)
     if not room:

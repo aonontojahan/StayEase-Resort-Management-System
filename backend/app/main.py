@@ -4,6 +4,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.audit.router import router as audit_router
 from app.auth.router import router as auth_router
 from app.rooms.router import router as rooms_router
 from app.bookings.router import router as bookings_router
@@ -14,9 +15,11 @@ from app.core.config import settings
 from app.core.database import Base, engine, SessionLocal
 from app.core.exceptions import StayEaseException
 from app.core.logging import setup_logging
+from app.core.rate_limiter import RateLimitMiddleware, SlidingWindowRateLimiter
 from app.core.seeding import seed_db
 
 # Import all models so SQLAlchemy picks them up for create_all
+import app.audit.models  # noqa
 import app.auth.models  # noqa
 import app.rooms.models  # noqa
 import app.bookings.models  # noqa
@@ -34,7 +37,9 @@ async def lifespan(app: FastAPI):
 
     # Create tables automatically in development if they don't exist
     if settings.ENVIRONMENT == "development":
-        logger.info("Development mode detected. Automatically generating database tables...")
+        logger.info("Development mode detected. Running database migration check...")
+        # Note: For production, use `alembic upgrade head` instead.
+        # Auto-create is kept for development convenience.
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
@@ -64,6 +69,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Rate Limiting Middleware
+rate_limiter = SlidingWindowRateLimiter(
+    max_requests=settings.RATE_LIMIT_MAX_REQUESTS,
+    window_seconds=settings.RATE_LIMIT_WINDOW_SECONDS,
+)
+app.add_middleware(RateLimitMiddleware, limiter=rate_limiter)
 
 
 # Global Custom Exception Handler
@@ -98,6 +111,7 @@ async def health_check():
 
 
 # Include all Routers
+app.include_router(audit_router, prefix=settings.API_V1_STR)
 app.include_router(auth_router, prefix=settings.API_V1_STR)
 app.include_router(rooms_router, prefix=settings.API_V1_STR)
 app.include_router(bookings_router, prefix=settings.API_V1_STR)

@@ -1,7 +1,7 @@
 import uuid
 from datetime import date
-from typing import List, Optional, Sequence
-from sqlalchemy import select
+from typing import Optional, Sequence
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,7 +18,9 @@ class RoomTypeRepository:
         return result.scalars().all()
 
     async def get_by_id(self, room_type_id: uuid.UUID) -> Optional[RoomType]:
-        result = await self.db.execute(select(RoomType).where(RoomType.id == room_type_id))
+        result = await self.db.execute(
+            select(RoomType).where(RoomType.id == room_type_id)
+        )
         return result.scalar_one_or_none()
 
     async def get_by_name(self, name: str) -> Optional[RoomType]:
@@ -49,11 +51,19 @@ class RoomRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_all(self) -> Sequence[Room]:
+    async def get_all(self, skip: int = 0, limit: int = 100) -> Sequence[Room]:
         result = await self.db.execute(
-            select(Room).options(selectinload(Room.room_type)).order_by(Room.room_number)
+            select(Room)
+            .options(selectinload(Room.room_type))
+            .order_by(Room.room_number)
+            .offset(skip)
+            .limit(limit)
         )
         return result.scalars().all()
+
+    async def count_all(self) -> int:
+        result = await self.db.execute(select(func.count(Room.id)))
+        return int(result.scalar() or 0)
 
     async def get_by_id(self, room_id: uuid.UUID) -> Optional[Room]:
         result = await self.db.execute(
@@ -62,20 +72,18 @@ class RoomRepository:
         return result.scalar_one_or_none()
 
     async def get_by_number(self, room_number: str) -> Optional[Room]:
-        result = await self.db.execute(select(Room).where(Room.room_number == room_number))
+        result = await self.db.execute(
+            select(Room).where(Room.room_number == room_number)
+        )
         return result.scalar_one_or_none()
 
     async def get_available(self, check_in: date, check_out: date) -> Sequence[Room]:
-        """Return rooms not booked in the given date range and not in Maintenance."""
         from app.bookings.models import Booking, BookingStatus
-        # Subquery: rooms that have overlapping confirmed/checked-in bookings
-        booked_subq = (
-            select(Booking.room_id)
-            .where(
-                Booking.status.in_([BookingStatus.confirmed, BookingStatus.checked_in]),
-                Booking.check_in_date < check_out,
-                Booking.check_out_date > check_in,
-            )
+
+        booked_subq = select(Booking.room_id).where(
+            Booking.status.in_([BookingStatus.confirmed, BookingStatus.checked_in]),
+            Booking.check_in_date < check_out,
+            Booking.check_out_date > check_in,
         )
         result = await self.db.execute(
             select(Room)

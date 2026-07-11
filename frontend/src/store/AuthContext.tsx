@@ -75,7 +75,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     setIsLoading(true)
     try {
-      await api.post("/auth/logout")
+      const refreshToken = localStorage.getItem("refreshToken")
+      if (refreshToken) {
+        await api.post("/auth/logout", { refresh_token: refreshToken })
+      }
     } catch {
       // Proceed with local logout even if API call fails
     } finally {

@@ -2,12 +2,15 @@ import uuid
 from typing import List
 
 from fastapi import APIRouter, Depends, status
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user, require_role
 from app.auth.models import User
 from app.core.database import get_db
 from app.core.exceptions import BadRequestException, NotFoundException
+from app.core.pagination import PaginationParams
 from app.housekeeping.models import TaskStatus
 from app.housekeeping.repository import HousekeepingRepository
 from app.housekeeping.schemas import TaskCreate, TaskRead, TaskStatusUpdate
@@ -20,17 +23,30 @@ HOUSEKEEPING_ROLES = ["Resort Owner", "Manager", "Housekeeping"]
 
 @router.get("/", response_model=List[TaskRead])
 async def list_tasks(
+    pagination: PaginationParams = Depends(),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """List tasks. Housekeeping staff only see their own tasks; managers see all."""
     repo = HousekeepingRepository(db)
     if current_user.role.name == "Housekeeping":
-        return await repo.get_by_assigned(current_user.id)
-    if current_user.role.name in MANAGEMENT_ROLES:
-        return await repo.get_all()
-    # Receptionist/Accountant can also see all
-    return await repo.get_all()
+        items = await repo.get_by_assigned(current_user.id, skip=pagination.skip, limit=pagination.limit)
+        total = await repo.count_by_assigned(current_user.id)
+    else:
+        items = await repo.get_all(skip=pagination.skip, limit=pagination.limit)
+        total = await repo.count_all()
+    return JSONResponse(
+        content=jsonable_encoder([TaskRead.model_validate(t) for t in items]),
+        headers={"X-Total-Count": str(total), "Access-Control-Expose-Headers": "X-Total-Count"},
+    )
+        total = await repo.count_by_assigned(current_user.id)
+    else:
+        items = await repo.get_all(skip=pagination.skip, limit=pagination.limit)
+        total = await repo.count_all()
+    return Response(
+        content=TaskRead.model_validate(items, many=True).model_dump_json(),
+        media_type="application/json",
+        headers={"X-Total-Count": str(total)},
+    )
 
 
 @router.post("/", response_model=TaskRead, status_code=status.HTTP_201_CREATED)
@@ -39,7 +55,6 @@ async def create_task(
     current_user: User = require_role(MANAGEMENT_ROLES),
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a new housekeeping task."""
     repo = HousekeepingRepository(db)
     return await repo.create(data, current_user.id)
 
@@ -51,7 +66,6 @@ async def update_task_status(
     current_user: User = require_role(HOUSEKEEPING_ROLES),
     db: AsyncSession = Depends(get_db),
 ):
-    """Update the status of a task."""
     try:
         new_status = TaskStatus(body.status)
     except ValueError:
@@ -71,7 +85,6 @@ async def delete_task(
     _: User = require_role(MANAGEMENT_ROLES),
     db: AsyncSession = Depends(get_db),
 ):
-    """Delete a housekeeping task."""
     repo = HousekeepingRepository(db)
     task = await repo.get_by_id(task_id)
     if not task:

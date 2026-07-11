@@ -9,6 +9,7 @@ import { Eye, EyeOff, Loader2, Lock, Mail, ShieldAlert } from "lucide-react"
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(1, "Password is required"),
+  _stayLoggedIn: z.boolean().optional(),
 })
 
 type LoginFormValues = z.infer<typeof loginSchema>

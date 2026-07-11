@@ -3,6 +3,8 @@ import stripe
 from typing import List
 
 from fastapi import APIRouter, Depends, status
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user, require_role
@@ -13,38 +15,79 @@ from app.core.database import get_db
 from app.core.config import settings
 from app.core.email import send_html_email, get_booking_confirmation_html
 from app.core.exceptions import BadRequestException, NotFoundException
+from app.core.pagination import PaginationParams
 from app.payments.repository import PaymentRepository
 from app.payments.models import PaymentMethod, PaymentStatus
 from app.payments.schemas import (
-    PaymentCreate, PaymentRead, RevenueSummary, PaymentStatusUpdate,
-    StripeIntentCreate, StripePaymentConfirm
+    PaymentCreate,
+    PaymentRead,
+    RevenueSummary,
+    PaymentStatusUpdate,
+    StripeIntentCreate,
+    StripePaymentConfirm,
 )
 
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
 
 FINANCE_ROLES = ["Resort Owner", "Manager", "Accountant", "Receptionist"]
-REFUND_ROLES  = ["Resort Owner", "Manager", "Accountant"]
+REFUND_ROLES = ["Resort Owner", "Manager", "Accountant"]
 
 
 @router.get("/", response_model=List[PaymentRead])
 async def list_payments(
+    pagination: PaginationParams = Depends(),
     _: User = require_role(FINANCE_ROLES),
     db: AsyncSession = Depends(get_db),
 ):
-    """List all payments."""
     repo = PaymentRepository(db)
-    return await repo.get_all()
+    items = await repo.get_all(skip=pagination.skip, limit=pagination.limit)
+    total = await repo.count_all()
+    return JSONResponse(
+        content=jsonable_encoder([PaymentRead.model_validate(p) for p in items]),
+        headers={
+            "X-Total-Count": str(total),
+            "Access-Control-Expose-Headers": "X-Total-Count",
+        },
+    )
 
 
 @router.get("/my", response_model=List[PaymentRead])
 async def list_my_payments(
+    pagination: PaginationParams = Depends(),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """List current guest's payments."""
     repo = PaymentRepository(db)
-    return await repo.get_by_guest(current_user.id)
+    items = await repo.get_by_guest(
+        current_user.id, skip=pagination.skip, limit=pagination.limit
+    )
+    total = await repo.count_by_guest(current_user.id)
+    return JSONResponse(
+        content=jsonable_encoder([PaymentRead.model_validate(p) for p in items]),
+        headers={
+            "X-Total-Count": str(total),
+            "Access-Control-Expose-Headers": "X-Total-Count",
+        },
+    )
+
+
+@router.get("/my", response_model=List[PaymentRead])
+async def list_my_payments(
+    pagination: PaginationParams = Depends(),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    repo = PaymentRepository(db)
+    items = await repo.get_by_guest(
+        current_user.id, skip=pagination.skip, limit=pagination.limit
+    )
+    total = await repo.count_by_guest(current_user.id)
+    return Response(
+        content=PaymentRead.model_validate(items, many=True).model_dump_json(),
+        media_type="application/json",
+        headers={"X-Total-Count": str(total)},
+    )
 
 
 @router.get("/summary", response_model=RevenueSummary)
@@ -52,7 +95,6 @@ async def revenue_summary(
     _: User = require_role(REFUND_ROLES),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get aggregated revenue summary."""
     repo = PaymentRepository(db)
     return await repo.get_revenue_summary()
 
@@ -63,7 +105,6 @@ async def payments_for_booking(
     _: User = require_role(FINANCE_ROLES),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get payments for a specific booking."""
     repo = PaymentRepository(db)
     return await repo.get_by_booking(booking_id)
 
@@ -74,8 +115,6 @@ async def record_payment(
     current_user: User = require_role(FINANCE_ROLES),
     db: AsyncSession = Depends(get_db),
 ):
-    """Record a new payment."""
-    # Verify booking exists
     booking_repo = BookingRepository(db)
     booking = await booking_repo.get_by_id(data.booking_id)
     if not booking:
@@ -91,7 +130,6 @@ async def refund_payment(
     _: User = require_role(REFUND_ROLES),
     db: AsyncSession = Depends(get_db),
 ):
-    """Mark a payment as refunded. Only Resort Owner, Manager, or Accountant can do this."""
     repo = PaymentRepository(db)
     payment = await repo.get_by_id(payment_id)
     if not payment:
@@ -108,10 +146,6 @@ async def create_stripe_intent(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Create a Stripe PaymentIntent for the specified booking and payment option.
-    If stripe config is missing, operates in Test/Mock Mode.
-    """
     booking_repo = BookingRepository(db)
     booking = await booking_repo.get_by_id(body.booking_id)
     if not booking:
@@ -143,14 +177,14 @@ async def create_stripe_intent(
                     "booking_id": str(booking.id),
                     "amount_type": body.amount_type,
                     "guest_id": str(booking.guest_id),
-                }
+                },
             )
             return {
                 "client_secret": intent.client_secret,
                 "amount": amount,
                 "currency": "USD",
                 "payment_intent_id": intent.id,
-                "is_mock": False
+                "is_mock": False,
             }
         except Exception as e:
             raise BadRequestException(f"Stripe PaymentIntent creation failed: {str(e)}")
@@ -161,7 +195,7 @@ async def create_stripe_intent(
             "amount": amount,
             "currency": "BDT",
             "payment_intent_id": mock_id,
-            "is_mock": True
+            "is_mock": True,
         }
 
 
@@ -171,16 +205,15 @@ async def confirm_stripe_payment(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Confirm Stripe payment, log it in the database, confirm booking, and send email.
-    """
     booking_repo = BookingRepository(db)
     booking = await booking_repo.get_by_id(body.booking_id)
     if not booking:
         raise NotFoundException("Booking not found.")
 
     if current_user.role.name == "Guest" and booking.guest_id != current_user.id:
-        raise BadRequestException("You can only confirm payments for your own bookings.")
+        raise BadRequestException(
+            "You can only confirm payments for your own bookings."
+        )
 
     payment_repo = PaymentRepository(db)
     existing_payments = await payment_repo.get_by_booking(booking.id)
@@ -204,7 +237,9 @@ async def confirm_stripe_payment(
             stripe.api_key = settings.STRIPE_SECRET_KEY
             intent = stripe.PaymentIntent.retrieve(body.payment_intent_id)
             if intent.status != "succeeded":
-                raise BadRequestException(f"Stripe payment was not successful: status is {intent.status}")
+                raise BadRequestException(
+                    f"Stripe payment was not successful: status is {intent.status}"
+                )
             stripe_amount = intent.amount / 100.0
             if abs(stripe_amount - amount) > 0.1:
                 amount = stripe_amount
@@ -227,7 +262,9 @@ async def confirm_stripe_payment(
 
     new_remaining = float(booking.total_amount) - float(booking.paid_amount)
     nights = (booking.check_out_date - booking.check_in_date).days
-    pay_status = "Fully Settled" if new_remaining <= 0 else f"Partially Settled (Deposit Paid)"
+    pay_status = (
+        "Fully Settled" if new_remaining <= 0 else f"Partially Settled (Deposit Paid)"
+    )
 
     email_html = get_booking_confirmation_html(
         guest_name=booking.guest.full_name,
@@ -240,15 +277,14 @@ async def confirm_stripe_payment(
         amount_paid=float(booking.paid_amount),
         remaining_balance=new_remaining,
         payment_status=pay_status,
-        booking_id=str(booking.id)
+        booking_id=str(booking.id),
     )
 
     send_html_email(
         to_email=booking.guest.email,
         subject=f"StayEase Resort - Booking Confirmation #{booking.id}",
         html_content=email_html,
-        text_content=f"Your booking at StayEase Resort has been confirmed! Booking ID: {booking.id}. Room: {booking.room.room_number}. Paid: TK {booking.paid_amount:.2f}. Balance: TK {new_remaining:.2f}."
+        text_content=f"Your booking at StayEase Resort has been confirmed! Booking ID: {booking.id}. Room: {booking.room.room_number}. Paid: TK {booking.paid_amount:.2f}. Balance: TK {new_remaining:.2f}.",
     )
 
     return payment
-
