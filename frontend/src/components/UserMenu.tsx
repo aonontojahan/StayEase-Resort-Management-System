@@ -1,13 +1,9 @@
 import React, { useState, useRef, useEffect } from "react"
 import {
   LogOut,
-  User,
-  Shield,
-  Settings,
   ChevronUp,
   UserCircle,
-  Lock,
-  ChevronRight,
+  Key,
 } from "lucide-react"
 import { useAuth } from "@/store/AuthContext"
 
@@ -19,14 +15,12 @@ interface UserMenuProps {
 export const UserMenu: React.FC<UserMenuProps> = ({ onEditProfile, onSecurity }) => {
   const { user, logout } = useAuth()
   const [open, setOpen] = useState(false)
-  const [settingsOpen, setSettingsOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setOpen(false)
-        setSettingsOpen(false)
       }
     }
     if (open) document.addEventListener("mousedown", handleClickOutside)
@@ -49,7 +43,6 @@ export const UserMenu: React.FC<UserMenuProps> = ({ onEditProfile, onSecurity })
         id="user-menu-trigger"
         onClick={() => {
           setOpen((v) => !v)
-          setSettingsOpen(false)
         }}
         className="w-full flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-secondary/60 transition-all duration-200 group"
         aria-haspopup="true"
@@ -84,7 +77,6 @@ export const UserMenu: React.FC<UserMenuProps> = ({ onEditProfile, onSecurity })
                 {initials}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold truncate">{user.full_name}</p>
                 <p className="text-[10px] text-muted-foreground truncate">{user.email}</p>
                 <span className="inline-flex items-center mt-0.5 rounded-full bg-primary/15 px-2 py-0.5 text-[9px] font-semibold text-primary">
                   {user.role.name}
@@ -93,79 +85,45 @@ export const UserMenu: React.FC<UserMenuProps> = ({ onEditProfile, onSecurity })
             </div>
           </div>
 
-          <div className="py-1.5">
-            {/* Settings with sub-menu */}
-            <div>
-              <button
-                className="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-secondary/60 transition-all duration-150 group"
-                onClick={() => setSettingsOpen((v) => !v)}
-                role="menuitem"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="h-7 w-7 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                    <Settings className="h-3.5 w-3.5 text-blue-500" />
-                  </div>
-                  <span>Settings</span>
-                </div>
-                <ChevronRight
-                  className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ${
-                    settingsOpen ? "rotate-90" : ""
-                  }`}
-                />
-              </button>
-
-              {/* Settings sub-items */}
-              {settingsOpen && (
-                <div className="bg-secondary/30 border-y border-secondary/40 animate-slide-down">
-                  <button
-                    className="w-full flex items-center gap-3 px-6 py-2.5 text-sm text-foreground hover:bg-secondary/60 transition-all duration-150"
-                    onClick={() => {
-                      onEditProfile()
-                      setOpen(false)
-                      setSettingsOpen(false)
-                    }}
-                    role="menuitem"
-                  >
-                    <div className="h-6 w-6 rounded-lg bg-violet-500/10 flex items-center justify-center">
-                      <UserCircle className="h-3 w-3 text-violet-500" />
-                    </div>
-                    <span className="text-xs font-medium">Edit Profile</span>
-                  </button>
-                  <button
-                    className="w-full flex items-center gap-3 px-6 py-2.5 text-sm text-foreground hover:bg-secondary/60 transition-all duration-150"
-                    onClick={() => {
-                      onSecurity()
-                      setOpen(false)
-                      setSettingsOpen(false)
-                    }}
-                    role="menuitem"
-                  >
-                    <div className="h-6 w-6 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                      <Lock className="h-3 w-3 text-amber-500" />
-                    </div>
-                    <span className="text-xs font-medium">Security</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Separator */}
-          <div className="mx-3 border-t border-border/50" />
-
-          {/* Logout */}
-          <div className="py-1.5">
+          <div className="py-1 px-1 space-y-0.5">
+            {/* Edit Profile */}
             <button
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-destructive hover:bg-destructive/10 transition-all duration-150 rounded-b-2xl"
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary transition-all duration-150 rounded-lg"
+              onClick={() => {
+                setOpen(false)
+                onEditProfile()
+              }}
+              role="menuitem"
+            >
+              <UserCircle className="h-4 w-4 text-muted-foreground" />
+              <span>Edit Profile Details</span>
+            </button>
+
+            {/* Change Password */}
+            <button
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary transition-all duration-150 rounded-lg"
+              onClick={() => {
+                setOpen(false)
+                onSecurity()
+              }}
+              role="menuitem"
+            >
+              <Key className="h-4 w-4 text-muted-foreground" />
+              <span>Change Password</span>
+            </button>
+
+            <div className="border-t border-border/50 my-1 mx-1" />
+
+            {/* Sign Out */}
+            <button
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-destructive hover:bg-destructive/10 transition-all duration-150 rounded-lg"
               onClick={() => {
                 setOpen(false)
                 logout()
               }}
               role="menuitem"
             >
-              <div className="h-7 w-7 rounded-lg bg-destructive/10 flex items-center justify-center">
-                <LogOut className="h-3.5 w-3.5 text-destructive" />
-              </div>
+              <LogOut className="h-4 w-4 text-destructive" />
               <span>Sign Out</span>
             </button>
           </div>

@@ -7,7 +7,7 @@ import { api } from "@/services/api"
 import { OccupancyReport, BookingsSummary } from "@/types/api"
 import { 
   User, Mail, Shield, CheckCircle, Clock, Key, Loader2, 
-  Home, BookOpen, BedDouble, Users, Sparkles, CreditCard, Menu, X
+  Home, BookOpen, BedDouble, Users, Sparkles, CreditCard, Menu, X, LogOut
 } from "lucide-react"
 
 import { Modal } from "@/components/Modal"
@@ -42,24 +42,34 @@ export const Dashboard: React.FC = () => {
   const [editProfileOpen, setEditProfileOpen] = useState(false)
   const [securityOpen, setSecurityOpen] = useState(false)
 
-  // Live stats
+  // Live stats & lists for ERP dashboard
   const [occupancy, setOccupancy] = useState<OccupancyReport | null>(null)
   const [bookingsSummary, setBookingsSummary] = useState<BookingsSummary | null>(null)
+  const [revenueReport, setRevenueReport] = useState<any[]>([])
+  const [loadingDashboard, setLoadingDashboard] = useState(false)
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<PasswordFormValues>({
-    resolver: zodResolver(passwordSchema),
-    defaultValues: { old_password: "", new_password: "" },
-  })
+  const fetchDashboardData = async () => {
+    if (!user || !["Resort Owner", "Manager", "Accountant"].includes(user.role.name)) return
+    setLoadingDashboard(true)
+    try {
+      const [occRes, summaryRes, revRes] = await Promise.all([
+        api.get<OccupancyReport>("/reports/occupancy"),
+        api.get<BookingsSummary>("/reports/bookings-summary"),
+        api.get<any[]>("/reports/revenue"),
+      ])
+      setOccupancy(occRes.data)
+      setBookingsSummary(summaryRes.data)
+      setRevenueReport(revRes.data)
+    } catch (err) {
+      console.error("Error loading ERP metrics", err)
+    } finally {
+      setLoadingDashboard(false)
+    }
+  }
 
   useEffect(() => {
-    if (user && activeTab === "Dashboard" && ["Resort Owner", "Manager", "Accountant"].includes(user.role.name)) {
-      api.get<OccupancyReport>("/reports/occupancy").then(res => setOccupancy(res.data)).catch(() => {})
-      api.get<BookingsSummary>("/reports/bookings-summary").then(res => setBookingsSummary(res.data)).catch(() => {})
+    if (activeTab === "Dashboard") {
+      fetchDashboardData()
     }
   }, [user, activeTab])
 
@@ -74,18 +84,6 @@ export const Dashboard: React.FC = () => {
     }
   }, [user])
 
-  const onPasswordSubmit = async (data: PasswordFormValues) => {
-    setSuccessMsg(null)
-    setErrorMsg(null)
-    try {
-      await api.post("/auth/change-password", data)
-      setSuccessMsg("Password updated successfully!")
-      reset()
-    } catch (err: any) {
-      setErrorMsg(err.response?.data?.detail || "Failed to update password.")
-    }
-  }
-
   if (!user) return null
 
   const handleTabChange = (tab: string) => {
@@ -95,10 +93,12 @@ export const Dashboard: React.FC = () => {
 
   const NavLinks = () => (
     <>
-      <button onClick={() => handleTabChange("Dashboard")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Dashboard" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
-        <Home className="h-4 w-4" />
-        <span>Dashboard</span>
-      </button>
+      {["Resort Owner", "Manager", "Accountant"].includes(user.role.name) && (
+        <button onClick={() => handleTabChange("Dashboard")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Dashboard" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
+          <Home className="h-4 w-4" />
+          <span>Dashboard</span>
+        </button>
+      )}
       {user.role.name === "Resort Owner" || user.role.name === "Manager" ? (
         <>
           <button onClick={() => handleTabChange("Staff Management")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Staff Management" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
@@ -149,6 +149,7 @@ export const Dashboard: React.FC = () => {
           </button>
         </>
       ) : null}
+
     </>
   )
 
@@ -160,178 +161,211 @@ export const Dashboard: React.FC = () => {
       case "Guests": return <GuestsPage />
       case "Housekeeping": return <HousekeepingPage />
       case "Payments": return <PaymentsPage />
-      case "Settings": return <SettingsPage />
+      case "Settings":
+        return (
+          <div className="space-y-6 max-w-2xl">
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight">Account Settings</h2>
+              <p className="text-sm text-muted-foreground">Manage your resort credentials and user profile information.</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="rounded-xl border bg-card p-6 shadow-sm flex flex-col justify-between h-44">
+                <div>
+                  <h3 className="font-semibold text-base">Account Profile</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Update your full name, profile picture, phone number, and contact info.</p>
+                </div>
+                <button 
+                  onClick={() => setEditProfileOpen(true)}
+                  className="w-full mt-4 bg-primary text-primary-foreground text-xs font-semibold py-2 px-4 rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  Edit Profile Details
+                </button>
+              </div>
+
+              <div className="rounded-xl border bg-card p-6 shadow-sm flex flex-col justify-between h-44">
+                <div>
+                  <h3 className="font-semibold text-base">Security & Password</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Change your account password regularly to keep your resort logs safe.</p>
+                </div>
+                <button 
+                  onClick={() => setSecurityOpen(true)}
+                  className="w-full mt-4 bg-secondary text-secondary-foreground text-xs font-semibold py-2 px-4 rounded-lg hover:bg-secondary/80 transition-colors"
+                >
+                  Change Password
+                </button>
+              </div>
+            </div>
+          </div>
+        )
       case "My Bookings": return <MyBookingsPage />
       case "Browse Rooms": return <BrowseRoomsPage />
       case "Payment History": return <PaymentHistoryPage />
       case "Housekeeping Tasks": return <HousekeepingTasksPage />
       case "Dashboard":
       default:
+        const totalRevenue = revenueReport.reduce((sum, r) => sum + r.revenue, 0)
+        const totalTransactions = revenueReport.reduce((sum, r) => sum + r.count, 0)
         return (
-          <>
-            {/* Welcome Panel */}
-            <div className="rounded-2xl bg-gradient-to-br from-emerald-900 via-teal-900 to-slate-900 p-6 md:p-8 text-white shadow-xl relative overflow-hidden">
-              <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-yellow-500/20 blur-3xl"></div>
-              <div className="absolute left-1/2 top-0 h-full w-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-              <div className="relative z-10 space-y-2">
-                <h2 className="text-2xl font-bold md:text-3xl font-serif tracking-wide">Welcome back, {user.full_name}!</h2>
-                <p className="text-emerald-100 text-sm md:text-base max-w-xl">
-                  StayEase session active. Here is an overview of your resort operations and account settings.
+          <div className="space-y-6">
+            {/* Welcome ERP Summary */}
+            <div className="rounded-2xl bg-gradient-to-br from-primary via-primary/95 to-emerald-900 p-6 text-white shadow-xl relative overflow-hidden">
+              <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-emerald-500/10 blur-3xl"></div>
+              <div className="relative z-10 space-y-1">
+                <h2 className="text-2xl font-bold md:text-3xl font-serif tracking-wide">StayEase Resort</h2>
+                <p className="text-emerald-100 text-xs md:text-sm max-w-xl">
+                  {user.full_name}, {user.role.name}
                 </p>
               </div>
             </div>
 
-            {/* Status widgets row - Only for analytics roles */}
-            {["Resort Owner", "Manager", "Accountant"].includes(user.role.name) && occupancy && bookingsSummary && (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <div className="rounded-xl border bg-card p-5 shadow-sm space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Occupancy Rate</p>
-                  <h3 className="text-2xl font-bold">{occupancy.occupancy_rate}%</h3>
-                  <p className="text-xs text-muted-foreground font-medium">{occupancy.occupied} / {occupancy.total_rooms} rooms occupied</p>
-                </div>
-                <div className="rounded-xl border bg-card p-5 shadow-sm space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Bookings</p>
-                  <h3 className="text-2xl font-bold">{bookingsSummary.Total}</h3>
-                  <p className="text-xs text-muted-foreground font-medium">{bookingsSummary.Pending} pending · {bookingsSummary.Confirmed} confirmed</p>
-                </div>
-                <div className="rounded-xl border bg-card p-5 shadow-sm space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">System Status</p>
-                  <h3 className="text-2xl font-bold text-green-600 flex items-center gap-1.5">
-                    <CheckCircle className="h-5 w-5" /> Active
-                  </h3>
-                  <p className="text-xs text-muted-foreground font-medium">All services operational</p>
-                </div>
+            {loadingDashboard ? (
+              <div className="flex items-center justify-center p-12">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
-            )}
-
-            {/* Detailed Info Cards Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              
-              {/* Profile Attributes Card */}
-              <div className="rounded-xl border bg-card p-6 shadow-sm space-y-6">
-                <div>
-                  <h3 className="text-lg font-bold">Account Profile</h3>
-                  <p className="text-sm text-muted-foreground">Detailed database system metadata.</p>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 border-b pb-3">
-                    <User className="h-4 w-4 text-primary shrink-0" />
-                    <div className="truncate">
-                      <p className="text-xs text-muted-foreground font-medium">Full Name</p>
-                      <p className="text-sm font-semibold truncate">{user.full_name}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 border-b pb-3">
-                    <Mail className="h-4 w-4 text-primary shrink-0" />
-                    <div className="truncate">
-                      <p className="text-xs text-muted-foreground font-medium">Email Address</p>
-                      <p className="text-sm font-semibold truncate">{user.email}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 border-b pb-3">
-                    <Shield className="h-4 w-4 text-primary shrink-0" />
+            ) : (
+              <>
+                {/* Metrics Cards Grid */}
+                <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                  {/* Occupancy Rate */}
+                  <div className="rounded-xl border bg-card p-5 shadow-sm space-y-2 flex flex-col justify-between">
                     <div>
-                      <p className="text-xs text-muted-foreground font-medium">Security Role</p>
-                      <p className="text-sm font-semibold flex items-center gap-1">
-                        {user.role.name}
-                      </p>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Occupancy Rate</p>
+                      <h3 className="text-2xl font-bold mt-1 text-primary">{occupancy?.occupancy_rate || 0}%</h3>
                     </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      {occupancy?.occupied || 0} of {occupancy?.total_rooms || 0} rooms booked
+                    </p>
                   </div>
 
-                  <div className="flex items-center gap-3 border-b pb-3">
-                    <Clock className="h-4 w-4 text-primary shrink-0" />
+                  {/* Booking Volume */}
+                  <div className="rounded-xl border bg-card p-5 shadow-sm space-y-2 flex flex-col justify-between">
                     <div>
-                      <p className="text-xs text-muted-foreground font-medium">Registered On</p>
-                      <p className="text-sm font-semibold">
-                        {new Date(user.created_at).toLocaleDateString(undefined, {
-                          year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                        })}
-                      </p>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Active Bookings</p>
+                      <h3 className="text-2xl font-bold mt-1 text-blue-600">{bookingsSummary?.Confirmed || 0}</h3>
                     </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      {bookingsSummary?.Pending || 0} pending confirmation
+                    </p>
+                  </div>
+
+                  {/* Revenue Summary */}
+                  <div className="rounded-xl border bg-card p-5 shadow-sm space-y-2 flex flex-col justify-between">
+                    <div>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total Revenue</p>
+                      <h3 className="text-2xl font-bold mt-1 text-emerald-600">TK {totalRevenue.toLocaleString()}</h3>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      From {totalTransactions} completed checkouts
+                    </p>
+                  </div>
+
+                  {/* Cleaning Queue */}
+                  <div className="rounded-xl border bg-card p-5 shadow-sm space-y-2 flex flex-col justify-between">
+                    <div>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Service Queue</p>
+                      <h3 className="text-2xl font-bold mt-1 text-amber-600">
+                        {(occupancy?.cleaning || 0) + (occupancy?.maintenance || 0)}
+                      </h3>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      {occupancy?.cleaning || 0} cleaning · {occupancy?.maintenance || 0} maintenance
+                    </p>
                   </div>
                 </div>
-              </div>
 
-              {/* Change Password Card */}
-              <div className="rounded-xl border bg-card p-6 shadow-sm space-y-6">
-                <div>
-                  <h3 className="text-lg font-bold">Update Password</h3>
-                  <p className="text-sm text-muted-foreground">Manage and secure your credentials.</p>
-                </div>
-
-                <form onSubmit={handleSubmit(onPasswordSubmit)} className="space-y-4">
-                  {successMsg && (
-                    <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-xs text-green-700">
-                      {successMsg}
-                    </div>
-                  )}
-                  {errorMsg && (
-                    <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive">
-                      {errorMsg}
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold text-muted-foreground">Old Password</label>
-                    <div className="relative">
-                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">
-                        <Key className="h-3.5 w-3.5" />
+                {/* Detailed Analytics Rows */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Room status distribution */}
+                  <div className="rounded-xl border bg-card p-5 shadow-sm space-y-4 lg:col-span-1">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Room Inventory Status</h4>
+                    <div className="space-y-3">
+                      <div>
+                        <div className="flex justify-between text-xs font-medium mb-1">
+                          <span>Available</span>
+                          <span className="text-green-600 font-bold">{occupancy?.available || 0}</span>
+                        </div>
+                        <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
+                          <div 
+                            className="bg-green-500 h-full rounded-full transition-all duration-300"
+                            style={{ width: `${occupancy ? (occupancy.available / occupancy.total_rooms) * 100 : 0}%` }}
+                          ></div>
+                        </div>
                       </div>
-                      <input
-                        {...register("old_password")}
-                        type="password"
-                        className={`block w-full rounded-lg border bg-card py-2 pl-9 pr-3 text-xs shadow-sm transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 ${
-                          errors.old_password ? "border-destructive focus:ring-destructive" : "border-border"
-                        }`}
-                        placeholder="Current password"
-                      />
+
+                      <div>
+                        <div className="flex justify-between text-xs font-medium mb-1">
+                          <span>Occupied</span>
+                          <span className="text-blue-600 font-bold">{occupancy?.occupied || 0}</span>
+                        </div>
+                        <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
+                          <div 
+                            className="bg-blue-500 h-full rounded-full transition-all duration-300"
+                            style={{ width: `${occupancy ? (occupancy.occupied / occupancy.total_rooms) * 100 : 0}%` }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between text-xs font-medium mb-1">
+                          <span>In Service / Cleaning</span>
+                          <span className="text-yellow-600 font-bold">{occupancy?.cleaning || 0}</span>
+                        </div>
+                        <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
+                          <div 
+                            className="bg-yellow-500 h-full rounded-full transition-all duration-300"
+                            style={{ width: `${occupancy ? (occupancy.cleaning / occupancy.total_rooms) * 100 : 0}%` }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between text-xs font-medium mb-1">
+                          <span>Maintenance Check</span>
+                          <span className="text-red-600 font-bold">{occupancy?.maintenance || 0}</span>
+                        </div>
+                        <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
+                          <div 
+                            className="bg-red-500 h-full rounded-full transition-all duration-300"
+                            style={{ width: `${occupancy ? (occupancy.maintenance / occupancy.total_rooms) * 100 : 0}%` }}
+                          ></div>
+                        </div>
+                      </div>
                     </div>
-                    {errors.old_password && (
-                      <p className="text-[10px] text-destructive font-medium">{errors.old_password.message}</p>
-                    )}
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold text-muted-foreground">New Password</label>
-                    <div className="relative">
-                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">
-                        <Key className="h-3.5 w-3.5" />
-                      </div>
-                      <input
-                        {...register("new_password")}
-                        type="password"
-                        className={`block w-full rounded-lg border bg-card py-2 pl-9 pr-3 text-xs shadow-sm transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 ${
-                          errors.new_password ? "border-destructive focus:ring-destructive" : "border-border"
-                        }`}
-                        placeholder="At least 6 characters"
-                      />
-                    </div>
-                    {errors.new_password && (
-                      <p className="text-[10px] text-destructive font-medium">{errors.new_password.message}</p>
-                    )}
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="flex w-full items-center justify-center rounded-lg bg-primary py-2 text-xs font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/95 disabled:opacity-50"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                        Updating...
-                      </>
+                  {/* Monthly Revenue chart list */}
+                  <div className="rounded-xl border bg-card p-5 shadow-sm space-y-4 lg:col-span-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Monthly Sales & Bookings Report</h4>
+                    {revenueReport.length === 0 ? (
+                      <p className="text-xs text-muted-foreground py-8 text-center">No payment history recorded yet.</p>
                     ) : (
-                      "Save Password"
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs text-left">
+                          <thead>
+                            <tr className="border-b text-muted-foreground uppercase font-semibold">
+                              <th className="py-2">Month</th>
+                              <th className="py-2 text-right">Transactions</th>
+                              <th className="py-2 text-right">Gross Income</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {revenueReport.map((rep, i) => (
+                              <tr key={i} className="hover:bg-muted/30">
+                                <td className="py-2.5 font-medium">{rep.month}</td>
+                                <td className="py-2.5 text-right font-mono">{rep.count}</td>
+                                <td className="py-2.5 text-right font-bold text-emerald-600">TK {rep.revenue.toLocaleString()}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     )}
-                  </button>
-                </form>
-              </div>
-            </div>
-          </>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         )
     }
   }
@@ -414,7 +448,7 @@ export const Dashboard: React.FC = () => {
           </div>
         </header>
 
-        <main className="p-6 md:p-8 space-y-6 w-full">
+        <main className="px-6 py-6 md:px-6 md:pb-8 md:pt-3 pt-3 space-y-6 w-full">
           {renderContent()}
         </main>
       </div>
