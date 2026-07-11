@@ -1,23 +1,19 @@
 import React, { useState, useEffect } from "react"
 import { useAuth } from "@/store/AuthContext"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
 import { api } from "@/services/api"
 import { OccupancyReport, BookingsSummary } from "@/types/api"
 import { 
-  User, Mail, Shield, CheckCircle, Clock, Key, Loader2, 
-  Home, BookOpen, BedDouble, Users, Sparkles, CreditCard, Menu, X, LogOut
+  Loader2, 
+  Home, BookOpen, BedDouble, Users, Sparkles, CreditCard, Menu, X
 } from "lucide-react"
 
-import { Modal } from "@/components/Modal"
 import { StaffManagement } from "@/components/StaffManagement"
 import { RoomsPage } from "@/pages/RoomsPage"
 import { BookingsPage } from "@/pages/BookingsPage"
 import { GuestsPage } from "@/pages/GuestsPage"
 import { HousekeepingPage } from "@/pages/HousekeepingPage"
 import { PaymentsPage } from "@/pages/PaymentsPage"
-import { SettingsPage } from "@/pages/SettingsPage"
+import { AccountantPage } from "@/pages/AccountantPage"
 import { MyBookingsPage } from "@/pages/MyBookingsPage"
 import { BrowseRoomsPage } from "@/pages/BrowseRoomsPage"
 import { PaymentHistoryPage } from "@/pages/PaymentHistoryPage"
@@ -26,17 +22,10 @@ import { UserMenu } from "@/components/UserMenu"
 import { NotificationBell } from "@/components/NotificationBell"
 import { EditProfileModal, SecurityModal } from "@/components/ProfileModals"
 
-const passwordSchema = z.object({
-  old_password: z.string().min(1, "Old password is required"),
-  new_password: z.string().min(6, "New password must be at least 6 characters"),
-})
-
-type PasswordFormValues = z.infer<typeof passwordSchema>
 
 export const Dashboard: React.FC = () => {
-  const { user, logout } = useAuth()
-  const [successMsg, setSuccessMsg] = useState<string | null>(null)
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const { user } = useAuth()
+
   const [activeTab, setActiveTab] = useState<string>("Dashboard")
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [editProfileOpen, setEditProfileOpen] = useState(false)
@@ -148,6 +137,13 @@ export const Dashboard: React.FC = () => {
             <span>Housekeeping Tasks</span>
           </button>
         </>
+      ) : user.role.name === "Accountant" ? (
+        <>
+          <button onClick={() => handleTabChange("Payments")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Payments" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
+            <CreditCard className="h-4 w-4" />
+            <span>Payments</span>
+          </button>
+        </>
       ) : null}
 
     </>
@@ -160,7 +156,7 @@ export const Dashboard: React.FC = () => {
       case "Bookings": return <BookingsPage />
       case "Guests": return <GuestsPage />
       case "Housekeeping": return <HousekeepingPage />
-      case "Payments": return <PaymentsPage />
+      case "Payments": return user.role.name === "Accountant" ? <AccountantPage /> : <PaymentsPage />
       case "Settings":
         return (
           <div className="space-y-6 max-w-2xl">

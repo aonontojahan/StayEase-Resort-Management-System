@@ -10,11 +10,12 @@ from app.bookings.repository import BookingRepository
 from app.core.database import get_db
 from app.core.exceptions import BadRequestException, NotFoundException
 from app.payments.repository import PaymentRepository
-from app.payments.schemas import PaymentCreate, PaymentRead, RevenueSummary
+from app.payments.schemas import PaymentCreate, PaymentRead, RevenueSummary, PaymentStatusUpdate
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
 
 FINANCE_ROLES = ["Resort Owner", "Manager", "Accountant", "Receptionist"]
+REFUND_ROLES  = ["Resort Owner", "Manager", "Accountant"]
 
 
 @router.get("/", response_model=List[PaymentRead])
@@ -39,7 +40,7 @@ async def list_my_payments(
 
 @router.get("/summary", response_model=RevenueSummary)
 async def revenue_summary(
-    _: User = require_role(["Resort Owner", "Manager", "Accountant"]),
+    _: User = require_role(REFUND_ROLES),
     db: AsyncSession = Depends(get_db),
 ):
     """Get aggregated revenue summary."""
@@ -73,3 +74,20 @@ async def record_payment(
 
     repo = PaymentRepository(db)
     return await repo.create(data, current_user.id)
+
+
+@router.patch("/{payment_id}/refund", response_model=PaymentRead)
+async def refund_payment(
+    payment_id: uuid.UUID,
+    _: User = require_role(REFUND_ROLES),
+    db: AsyncSession = Depends(get_db),
+):
+    """Mark a payment as refunded. Only Resort Owner, Manager, or Accountant can do this."""
+    repo = PaymentRepository(db)
+    payment = await repo.get_by_id(payment_id)
+    if not payment:
+        raise NotFoundException("Payment not found.")
+    if payment.status != "Completed":
+        raise BadRequestException("Only completed payments can be refunded.")
+    updated = await repo.refund_payment(payment_id)
+    return updated

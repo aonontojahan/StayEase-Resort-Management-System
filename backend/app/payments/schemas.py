@@ -43,3 +43,7 @@ class RevenueSummary(BaseModel):
     total_payments: int
     completed_payments: float
     refunded_payments: float
+
+
+class PaymentStatusUpdate(BaseModel):
+    status: str

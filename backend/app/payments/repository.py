@@ -95,3 +95,11 @@ class PaymentRepository:
             completed_payments=completed,
             refunded_payments=refunded,
         )
+
+    async def refund_payment(self, payment_id: uuid.UUID) -> Optional[Payment]:
+        payment = await self.get_by_id(payment_id)
+        if not payment:
+            return None
+        payment.status = PaymentStatus.refunded
+        await self.db.flush()
+        return await self.get_by_id(payment_id)
