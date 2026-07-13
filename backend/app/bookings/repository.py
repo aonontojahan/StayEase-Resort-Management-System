@@ -51,7 +51,9 @@ class BookingRepository:
     ) -> Sequence[Booking]:
         result = await self.db.execute(
             select(Booking)
-            .where(Booking.guest_id == guest_id)
+            .where(
+                Booking.guest_id == guest_id, Booking.status != BookingStatus.pending
+            )
             .options(
                 selectinload(Booking.guest),
                 selectinload(Booking.room).selectinload(Room.room_type),

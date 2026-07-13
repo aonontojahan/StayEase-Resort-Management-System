@@ -25,6 +25,8 @@ from app.core.exceptions import (
 from app.core.pagination import PaginationParams
 from app.invoices.repository import InvoiceRepository
 from app.invoices.schemas import InvoiceCreate, InvoiceItemCreate
+from app.payments.models import PaymentStatus
+from app.payments.repository import PaymentRepository
 from app.rooms.repository import RoomRepository
 
 router = APIRouter(prefix="/bookings", tags=["Bookings"])
@@ -150,7 +152,7 @@ async def create_booking(
 async def update_booking_status(
     booking_id: uuid.UUID,
     body: BookingStatusUpdate,
-    current_user: User = require_role(STAFF_ROLES),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     try:
@@ -164,12 +166,54 @@ async def update_booking_status(
     if not booking:
         raise NotFoundException("Booking not found.")
 
+    is_staff = current_user.role.name in STAFF_ROLES
+    is_owner = booking.guest_id == current_user.id
+
+    if new_status == BookingStatus.cancelled:
+        if not is_staff and not is_owner:
+            raise ForbiddenException("You cannot cancel this booking.")
+        if booking.status == BookingStatus.cancelled:
+            raise BadRequestException("Booking is already cancelled.")
+        if booking.status in (BookingStatus.checked_out,):
+            raise BadRequestException("Cannot cancel a completed booking.")
+    else:
+        if not is_staff:
+            raise ForbiddenException("Only staff can change booking status.")
+
     room_repo = RoomRepository(db)
     room = await room_repo.get_by_id(booking.room_id)
+
+    if new_status == BookingStatus.cancelled:
+        total = float(booking.total_amount)
+        paid = float(booking.paid_amount)
+
+        if paid > 0:
+            payment_repo = PaymentRepository(db)
+            payments = await payment_repo.get_by_booking(booking.id)
+            is_full_payment = paid >= total * 0.95
+            for p in payments:
+                if p.status == PaymentStatus.completed:
+                    if is_full_payment:
+                        refund_amt = float(p.amount) - (
+                            total * 0.3 * float(p.amount) / paid
+                        )
+                        p.notes = (
+                            f"Cancelled - refunded TK {refund_amt:.2f} (70% of total)"
+                        )
+                    else:
+                        p.notes = f"Cancelled - deposit forfeited (0% refund)"
+                    p.status = PaymentStatus.refunded
+                    db.add(p)
+            await db.flush()
+
+        if room:
+            await room_repo.update(room, {"status": "Cleaning"})
+        return await repo.update_status(booking, new_status)
+
     if room:
         if new_status == BookingStatus.checked_in:
             await room_repo.update(room, {"status": "Occupied"})
-        elif new_status in [BookingStatus.checked_out, BookingStatus.cancelled]:
+        elif new_status == BookingStatus.checked_out:
             await room_repo.update(room, {"status": "Cleaning"})
 
     return await repo.update_status(booking, new_status)

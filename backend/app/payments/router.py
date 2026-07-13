@@ -223,7 +223,7 @@ async def create_stripe_intent(
         }
 
 
-@router.post("/stripe/confirm", response_model=PaymentRead)
+@router.post("/stripe/confirm")
 async def confirm_stripe_payment(
     body: StripePaymentConfirm,
     current_user: User = Depends(get_current_user),
@@ -243,7 +243,7 @@ async def confirm_stripe_payment(
     existing_payments = await payment_repo.get_by_booking(booking.id)
     for p in existing_payments:
         if p.transaction_ref == body.payment_intent_id:
-            return p
+            return {"payment": PaymentRead.model_validate(p).model_dump()}
 
     remaining_balance = float(booking.total_amount) - float(booking.paid_amount)
     if remaining_balance <= 0:
@@ -350,7 +350,7 @@ async def confirm_stripe_payment(
     }
 
 
-@router.post("/mobile-banking", response_model=PaymentRead)
+@router.post("/mobile-banking")
 async def pay_via_mobile_banking(
     body: MobileBankingPayment,
     current_user: User = Depends(get_current_user),

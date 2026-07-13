@@ -5,7 +5,7 @@ import { useToast } from "@/components/Toast"
 import { ConfirmModal, Modal } from "@/components/Modal"
 import { 
   BookOpen, Loader2, RefreshCw, XCircle, CreditCard, 
-  CheckCircle2, Info
+  CheckCircle2, Info, FileText
 } from "lucide-react"
 
 const STATUS_COLORS: Record<string, string> = {
@@ -33,6 +33,7 @@ export const MyBookingsPage: React.FC = () => {
   const [stripeIntent, setStripeIntent] = useState<StripeIntent | null>(null)
   const [senderPhone, setSenderPhone] = useState("")
   const [transactionId, setTransactionId] = useState("")
+  const [paymentInvoiceId, setPaymentInvoiceId] = useState<string | null>(null)
 
   const fetchBookings = async () => {
     setLoading(true)
@@ -71,6 +72,7 @@ export const MyBookingsPage: React.FC = () => {
   const initiateBalancePayment = async (booking: Booking) => {
     try {
       setPayBooking(booking)
+      setPaymentInvoiceId(null)
       setPayMethod("Card")
       setCardNumber("")
       setCardExpiry("")
@@ -113,12 +115,13 @@ export const MyBookingsPage: React.FC = () => {
 
     setPaymentProcessing(true)
     try {
-      await api.post("/payments/stripe/confirm", {
+      const res = await api.post("/payments/stripe/confirm", {
         booking_id: payBooking.id,
         payment_intent_id: stripeIntent.payment_intent_id,
         amount_type: "full"
       })
 
+      setPaymentInvoiceId(res.data?.invoice_id || null)
       toastSuccess("Remaining balance paid and settled successfully!")
       setPayBooking(null)
       setStripeIntent(null)
@@ -144,6 +147,14 @@ export const MyBookingsPage: React.FC = () => {
     setCardExpiry(value)
   }
 
+  const openInvoice = (invId: string) => {
+    const token = localStorage.getItem("access_token")
+    window.open(
+      `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/invoices/${invId}/html?token=${token}`,
+      "_blank"
+    )
+  }
+
   const onMobileBankingPay = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!payBooking || !stripeIntent) return
@@ -159,7 +170,7 @@ export const MyBookingsPage: React.FC = () => {
 
     setPaymentProcessing(true)
     try {
-      await api.post("/payments/mobile-banking", {
+      const res = await api.post("/payments/mobile-banking", {
         booking_id: payBooking.id,
         amount: stripeIntent.amount,
         payment_method: payMethod,
@@ -168,6 +179,7 @@ export const MyBookingsPage: React.FC = () => {
         amount_type: "full",
       })
 
+      setPaymentInvoiceId(res.data?.invoice_id || null)
       toastSuccess(`${payMethod} payment recorded! Balance settled successfully.`)
       setPayBooking(null)
       setStripeIntent(null)
@@ -206,6 +218,21 @@ export const MyBookingsPage: React.FC = () => {
           <RefreshCw className="h-4 w-4 text-muted-foreground" />
         </button>
       </div>
+
+      {paymentInvoiceId && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 flex items-center justify-between shadow-sm">
+          <div>
+            <p className="text-sm font-bold text-emerald-800">Payment successful!</p>
+            <p className="text-xs text-emerald-600">Your invoice is ready for download.</p>
+          </div>
+          <button
+            onClick={() => { openInvoice(paymentInvoiceId); setPaymentInvoiceId(null) }}
+            className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 transition-colors"
+          >
+            <FileText className="h-4 w-4" /> Download Invoice
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <div className="p-12 text-center">
@@ -273,7 +300,7 @@ export const MyBookingsPage: React.FC = () => {
                 </div>
 
                 <div className="flex items-center justify-between pt-4 border-t mt-4 gap-2">
-                  {b.status === "Pending" && (
+                  {(b.status === "Pending" || b.status === "Confirmed") && (
                     <button
                       onClick={() => setCancelBooking(b)}
                       className="flex items-center justify-center gap-1.5 rounded-lg border border-destructive text-destructive px-3.5 py-2 text-sm font-semibold hover:bg-destructive/5 transition-colors"
@@ -282,7 +309,7 @@ export const MyBookingsPage: React.FC = () => {
                     </button>
                   )}
 
-                  {remainingBalance > 0 && (b.status === "Pending" || b.status === "Confirmed") && (
+                  {remainingBalance > 0 && b.status === "Confirmed" && (
                     <button
                       onClick={() => initiateBalancePayment(b)}
                       className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-primary py-2 px-4 text-sm font-bold text-primary-foreground hover:bg-primary/95 transition-all shadow-sm"
@@ -300,7 +327,11 @@ export const MyBookingsPage: React.FC = () => {
       <ConfirmModal
         isOpen={!!cancelBooking}
         title="Cancel Reservation"
-        message={`Are you sure you want to cancel your reservation for ${cancelBooking?.room.room_type.name} (${cancelBooking?.check_in_date} to ${cancelBooking?.check_out_date})?`}
+        message={
+          cancelBooking
+            ? `Cancel ${cancelBooking.room.room_type.name} (${cancelBooking.check_in_date} to ${cancelBooking.check_out_date})? Refund Policy: 30% deposit = non-refundable. Full payment = 70% refundable.`
+            : ""
+        }
         confirmLabel="Yes, Cancel"
         onConfirm={onCancelBooking}
         onCancel={() => setCancelBooking(null)}
