@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 import stripe
 from typing import List
@@ -16,8 +17,11 @@ from app.core.config import settings
 from app.core.email import send_html_email, get_booking_confirmation_html
 from app.core.exceptions import BadRequestException, NotFoundException
 from app.core.pagination import PaginationParams
+from app.invoices.schemas import InvoiceCreate, InvoiceItemCreate
+from app.invoices.repository import InvoiceRepository
 from app.payments.repository import PaymentRepository
 from app.payments.schemas import (
+    MobileBankingPayment,
     PaymentCreate,
     PaymentRead,
     RevenueSummary,
@@ -89,7 +93,7 @@ async def payments_for_booking(
     return await repo.get_by_booking(booking_id)
 
 
-@router.post("/", response_model=PaymentRead, status_code=status.HTTP_201_CREATED)
+@router.post("/", status_code=status.HTTP_201_CREATED)
 async def record_payment(
     data: PaymentCreate,
     current_user: User = require_role(FINANCE_ROLES),
@@ -101,7 +105,47 @@ async def record_payment(
         raise NotFoundException("Booking not found.")
 
     repo = PaymentRepository(db)
-    return await repo.create(data, current_user.id)
+    old_paid = float(booking.paid_amount)
+    payment = await repo.create(data, current_user.id)
+
+    booking_total = float(booking.total_amount)
+    nights = (booking.check_out_date - booking.check_in_date).days
+    is_full = float(payment.amount) >= booking_total * 0.95
+
+    if old_paid > 0:
+        desc = f"Due Payment (70%) - {booking.room.room_type.name} x {nights} nights"
+        qty = 1
+        uprice = payment.amount
+    elif is_full:
+        desc = f"Full Payment (100%) - {booking.room.room_type.name} x {nights} nights"
+        qty = nights
+        uprice = float(booking.room.room_type.base_price_per_night)
+    else:
+        desc = f"Pre-payment (30% Deposit) - {booking.room.room_type.name}"
+        qty = 1
+        uprice = payment.amount
+
+    inv_data = InvoiceCreate(
+        booking_id=booking.id,
+        due_date=booking.check_in_date,
+        subtotal=payment.amount,
+        tax_rate=0,
+        items=[
+            InvoiceItemCreate(
+                description=desc,
+                quantity=qty,
+                unit_price=uprice,
+                amount=payment.amount,
+            )
+        ],
+    )
+    invoice_repo = InvoiceRepository(db)
+    invoice = await invoice_repo.create(inv_data, booking.guest_id)
+
+    return {
+        "payment": PaymentRead.model_validate(payment).model_dump(),
+        "invoice_id": str(invoice.id),
+    }
 
 
 @router.patch("/{payment_id}/refund", response_model=PaymentRead)
@@ -233,17 +277,49 @@ async def confirm_stripe_payment(
         transaction_ref=body.payment_intent_id,
         notes=f"Stripe payment ({body.amount_type} option).",
     )
+    old_paid = float(booking.paid_amount)
     payment = await payment_repo.create(payment_data, current_user.id)
 
     if booking.status == BookingStatus.pending:
         await booking_repo.update_status(booking, BookingStatus.confirmed)
 
-    await db.refresh(booking)
-
-    new_remaining = float(booking.total_amount) - float(booking.paid_amount)
+    booking_total = float(booking.total_amount)
     nights = (booking.check_out_date - booking.check_in_date).days
+
+    if old_paid > 0:
+        desc = f"Due Payment (70%) - {booking.room.room_type.name} x {nights} nights"
+        qty = 1
+        uprice = payment.amount
+    elif body.amount_type == "full":
+        desc = f"Full Payment (100%) - {booking.room.room_type.name} x {nights} nights"
+        qty = nights
+        uprice = float(booking.room.room_type.base_price_per_night)
+    else:
+        desc = f"Pre-payment (30% Deposit) - {booking.room.room_type.name}"
+        qty = 1
+        uprice = payment.amount
+
+    inv_data = InvoiceCreate(
+        booking_id=booking.id,
+        due_date=booking.check_in_date,
+        subtotal=payment.amount,
+        tax_rate=0,
+        items=[
+            InvoiceItemCreate(
+                description=desc,
+                quantity=qty,
+                unit_price=uprice,
+                amount=payment.amount,
+            )
+        ],
+    )
+    invoice_repo = InvoiceRepository(db)
+    invoice = await invoice_repo.create(inv_data, booking.guest_id)
+
+    new_paid = old_paid + float(payment.amount)
+    new_remaining = booking_total - new_paid
     pay_status = (
-        "Fully Settled" if new_remaining <= 0 else f"Partially Settled (Deposit Paid)"
+        "Fully Settled" if new_remaining <= 0 else "Partially Settled (Deposit Paid)"
     )
 
     email_html = get_booking_confirmation_html(
@@ -253,18 +329,132 @@ async def confirm_stripe_payment(
         check_in=str(booking.check_in_date),
         check_out=str(booking.check_out_date),
         nights=nights,
-        total_amount=float(booking.total_amount),
-        amount_paid=float(booking.paid_amount),
+        total_amount=booking_total,
+        amount_paid=new_paid,
         remaining_balance=new_remaining,
         payment_status=pay_status,
         booking_id=str(booking.id),
     )
 
-    send_html_email(
+    await asyncio.to_thread(
+        send_html_email,
         to_email=booking.guest.email,
         subject=f"StayEase Resort - Booking Confirmation #{booking.id}",
         html_content=email_html,
-        text_content=f"Your booking at StayEase Resort has been confirmed! Booking ID: {booking.id}. Room: {booking.room.room_number}. Paid: TK {booking.paid_amount:.2f}. Balance: TK {new_remaining:.2f}.",
+        text_content=f"Your booking at StayEase Resort has been confirmed! Booking ID: {booking.id}. Room: {booking.room.room_number}. Paid: TK {new_paid:.2f}. Balance: TK {new_remaining:.2f}.",
     )
 
-    return payment
+    return {
+        "payment": PaymentRead.model_validate(payment).model_dump(),
+        "invoice_id": str(invoice.id),
+    }
+
+
+@router.post("/mobile-banking", response_model=PaymentRead)
+async def pay_via_mobile_banking(
+    body: MobileBankingPayment,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    booking_repo = BookingRepository(db)
+    booking = await booking_repo.get_by_id(body.booking_id)
+    if not booking:
+        raise NotFoundException("Booking not found.")
+
+    if current_user.role.name == "Guest" and booking.guest_id != current_user.id:
+        raise BadRequestException("You can only pay for your own bookings.")
+
+    remaining = float(booking.total_amount) - float(booking.paid_amount)
+    if remaining <= 0:
+        raise BadRequestException("Booking is already fully paid.")
+
+    paid_so_far = float(booking.paid_amount)
+    if body.amount_type == "deposit":
+        target_deposit = float(booking.total_amount) * 0.3
+        capped = min(body.amount, target_deposit - paid_so_far, remaining)
+    else:
+        capped = min(body.amount, remaining)
+
+    if capped <= 0:
+        raise BadRequestException("Payment amount must be greater than zero.")
+
+    payment_data = PaymentCreate(
+        booking_id=booking.id,
+        amount=capped,
+        payment_method=body.payment_method,
+        transaction_ref=body.transaction_ref,
+        notes=f"{body.payment_method} payment via {body.sender_phone} ({body.amount_type})",
+    )
+    old_paid = float(booking.paid_amount)
+    payment_repo = PaymentRepository(db)
+    payment = await payment_repo.create(payment_data, current_user.id)
+
+    if booking.status == BookingStatus.pending:
+        await booking_repo.update_status(booking, BookingStatus.confirmed)
+
+    booking_total = float(booking.total_amount)
+    nights = (booking.check_out_date - booking.check_in_date).days
+
+    if old_paid > 0:
+        desc = f"Due Payment (70%) - {booking.room.room_type.name} x {nights} nights"
+        qty = 1
+        uprice = capped
+    elif body.amount_type == "full" or capped >= booking_total * 0.95:
+        desc = f"Full Payment (100%) - {booking.room.room_type.name} x {nights} nights"
+        qty = nights
+        uprice = float(booking.room.room_type.base_price_per_night)
+    else:
+        desc = f"Pre-payment (30% Deposit via {body.payment_method}) - {booking.room.room_type.name}"
+        qty = 1
+        uprice = capped
+
+    inv_data = InvoiceCreate(
+        booking_id=booking.id,
+        due_date=booking.check_in_date,
+        subtotal=capped,
+        tax_rate=0,
+        items=[
+            InvoiceItemCreate(
+                description=desc,
+                quantity=qty,
+                unit_price=uprice,
+                amount=capped,
+            )
+        ],
+    )
+    invoice_repo = InvoiceRepository(db)
+    invoice = await invoice_repo.create(inv_data, booking.guest_id)
+
+    new_paid = old_paid + capped
+    new_remaining = booking_total - new_paid
+    pay_status = (
+        "Fully Settled"
+        if new_remaining <= 0
+        else f"Partially Settled ({body.payment_method})"
+    )
+
+    email_html = get_booking_confirmation_html(
+        guest_name=booking.guest.full_name,
+        room_name=booking.room.room_type.name,
+        room_number=booking.room.room_number,
+        check_in=str(booking.check_in_date),
+        check_out=str(booking.check_out_date),
+        nights=nights,
+        total_amount=booking_total,
+        amount_paid=new_paid,
+        remaining_balance=new_remaining,
+        payment_status=pay_status,
+        booking_id=str(booking.id),
+    )
+    await asyncio.to_thread(
+        send_html_email,
+        to_email=booking.guest.email,
+        subject=f"StayEase Resort - Booking Confirmation #{booking.id}",
+        html_content=email_html,
+        text_content=f"Your booking at StayEase Resort has been confirmed! Booking ID: {booking.id}. Room: {booking.room.room_number}. Paid: TK {new_paid:.2f}. Balance: TK {new_remaining:.2f}.",
+    )
+
+    return {
+        "payment": PaymentRead.model_validate(payment).model_dump(),
+        "invoice_id": str(invoice.id),
+    }

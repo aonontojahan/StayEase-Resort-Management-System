@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { api } from "@/services/api"
-import { Loader2, Plus, Users } from "lucide-react"
+import { Loader2, Plus, Trash2, Users } from "lucide-react"
 
 const userSchema = z.object({
   email: z.string().email("Invalid email"),
@@ -22,6 +22,8 @@ export const StaffManagement: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<UserFormValues>({
     resolver: zodResolver(userSchema),
@@ -60,6 +62,31 @@ export const StaffManagement: React.FC = () => {
       fetchUsers()
     } catch (err: any) {
       setErrorMsg(err.response?.data?.detail || "Failed to create user.")
+    }
+  }
+
+  const canDelete = (target: any) => {
+    if (!user || target.id === user.id) return false
+    if (user.role.name === "Resort Owner") return true
+    if (user.role.name === "Manager") {
+      return !["Resort Owner", "Manager"].includes(target.role.name)
+    }
+    return false
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    setErrorMsg(null)
+    try {
+      await api.delete(`/auth/users/${deleteTarget.id}`)
+      setSuccessMsg(`User '${deleteTarget.full_name}' deleted successfully.`)
+      setDeleteTarget(null)
+      fetchUsers()
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.detail || "Failed to delete user.")
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -130,6 +157,7 @@ export const StaffManagement: React.FC = () => {
                   <th className="px-6 py-3">Email</th>
                   <th className="px-6 py-3">Role</th>
                   <th className="px-6 py-3">Status</th>
+                  <th className="px-6 py-3"></th>
                 </tr>
               </thead>
               <tbody>
@@ -139,6 +167,17 @@ export const StaffManagement: React.FC = () => {
                     <td className="px-6 py-4">{u.email}</td>
                     <td className="px-6 py-4"><span className="px-2 py-1 bg-primary/10 text-primary text-xs rounded-full font-medium">{u.role.name}</span></td>
                     <td className="px-6 py-4">{u.is_active ? <span className="text-green-600 font-medium">Active</span> : <span className="text-destructive font-medium">Inactive</span>}</td>
+                    <td className="px-6 py-4">
+                      {canDelete(u) && (
+                        <button
+                          onClick={() => setDeleteTarget(u)}
+                          className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all"
+                          title={`Delete ${u.full_name}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -146,6 +185,34 @@ export const StaffManagement: React.FC = () => {
           )}
         </div>
       </div>
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => !deleting && setDeleteTarget(null)}>
+          <div className="rounded-xl border bg-card p-6 shadow-xl max-w-sm w-full mx-4 space-y-4" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold">Confirm Delete</h3>
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete <strong>{deleteTarget.full_name}</strong> ({deleteTarget.role.name})? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+                className="rounded-lg border bg-card px-4 py-2 text-xs font-semibold hover:bg-secondary transition-all disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex items-center gap-1.5 rounded-lg bg-destructive px-4 py-2 text-xs font-semibold text-destructive-foreground shadow-sm hover:bg-destructive/90 transition-all disabled:opacity-50"
+              >
+                {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

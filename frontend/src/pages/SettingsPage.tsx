@@ -51,13 +51,13 @@ export const SettingsPage: React.FC = () => {
             <h3 className="font-bold flex items-center gap-2"><Shield className="h-4 w-4" /> Security</h3>
             <p className="text-xs text-muted-foreground">Password changes are handled on the main Dashboard page under "Update Password".</p>
           </div>
-          <div className="rounded-xl border bg-card p-5 shadow-sm space-y-4 opacity-50 cursor-not-allowed">
+          <div className="rounded-xl border bg-card p-5 shadow-sm space-y-4">
             <h3 className="font-bold flex items-center gap-2"><Bell className="h-4 w-4" /> Notifications</h3>
-            <p className="text-xs text-muted-foreground">Notification preferences coming soon in a future update.</p>
+            <p className="text-xs text-muted-foreground">Notification preferences can be configured from the bell icon in the top navigation bar.</p>
           </div>
-          <div className="rounded-xl border bg-card p-5 shadow-sm space-y-4 opacity-50 cursor-not-allowed">
+          <div className="rounded-xl border bg-card p-5 shadow-sm space-y-4">
             <h3 className="font-bold flex items-center gap-2"><UserIcon className="h-4 w-4" /> Edit Profile</h3>
-            <p className="text-xs text-muted-foreground">Profile editing coming soon.</p>
+            <p className="text-xs text-muted-foreground">Profile editing is available from the User Menu in the sidebar.</p>
           </div>
         </div>
       </div>

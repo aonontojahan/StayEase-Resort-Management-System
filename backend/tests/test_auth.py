@@ -8,13 +8,13 @@ async def test_register_guest_success(client: AsyncClient):
     """Test registering a new guest user is successful and returns authentication tokens."""
     payload = {
         "email": "guest@stayease.com",
-        "password": "guestpassword123",
+        "password": "GuestPass123!",
         "full_name": "John Guest",
-        "phone_number": "+1234567890"
+        "phone_number": "+1234567890",
     }
     response = await client.post("/api/v1/auth/register", json=payload)
     assert response.status_code == status.HTTP_201_CREATED
-    
+
     data = response.json()
     assert "access_token" in data
     assert "refresh_token" in data
@@ -28,7 +28,7 @@ async def test_register_duplicate_email(client: AsyncClient):
     """Test registering with an already existing email returns 400 Bad Request."""
     payload = {
         "email": "duplicate@stayease.com",
-        "password": "password123",
+        "password": "DupPass123!",
         "full_name": "First User",
     }
     # Register first time
@@ -47,7 +47,7 @@ async def test_login_success(client: AsyncClient):
     # Register user
     register_payload = {
         "email": "login@stayease.com",
-        "password": "mysecurepassword",
+        "password": "LoginSecur3!",
         "full_name": "Login Test",
     }
     await client.post("/api/v1/auth/register", json=register_payload)
@@ -55,7 +55,7 @@ async def test_login_success(client: AsyncClient):
     # Login
     login_payload = {
         "email": "login@stayease.com",
-        "password": "mysecurepassword",
+        "password": "LoginSecur3!",
     }
     response = await client.post("/api/v1/auth/login", json=login_payload)
     assert response.status_code == status.HTTP_200_OK
@@ -71,7 +71,7 @@ async def test_login_failure(client: AsyncClient):
     # Register user
     register_payload = {
         "email": "fail@stayease.com",
-        "password": "correctpassword",
+        "password": "Corr3ctPass!",
         "full_name": "Fail Test",
     }
     await client.post("/api/v1/auth/register", json=register_payload)
@@ -79,7 +79,7 @@ async def test_login_failure(client: AsyncClient):
     # Incorrect login
     login_payload = {
         "email": "fail@stayease.com",
-        "password": "wrongpassword",
+        "password": "WrongPass123!",
     }
     response = await client.post("/api/v1/auth/login", json=login_payload)
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
@@ -92,7 +92,7 @@ async def test_get_current_user_profile(client: AsyncClient):
     # Register & Auto-login
     payload = {
         "email": "me@stayease.com",
-        "password": "password123",
+        "password": "MePass123!",
         "full_name": "Me Myself",
     }
     reg_response = await client.post("/api/v1/auth/register", json=payload)
@@ -117,7 +117,7 @@ async def test_token_refresh(client: AsyncClient):
     # Register & Auto-login
     payload = {
         "email": "refresh@stayease.com",
-        "password": "password123",
+        "password": "Refr3shPass!",
         "full_name": "Refresh Test",
     }
     reg_response = await client.post("/api/v1/auth/register", json=payload)
@@ -127,7 +127,7 @@ async def test_token_refresh(client: AsyncClient):
     refresh_payload = {"refresh_token": refresh_token}
     response = await client.post("/api/v1/auth/refresh", json=refresh_payload)
     assert response.status_code == status.HTTP_200_OK
-    
+
     data = response.json()
     assert "access_token" in data
     assert "refresh_token" in data
@@ -140,7 +140,7 @@ async def test_change_password(client: AsyncClient):
     # Register & Auto-login
     payload = {
         "email": "changepassword@stayease.com",
-        "password": "oldpassword123",
+        "password": "OldPass123!",
         "full_name": "Pass Change",
     }
     reg_response = await client.post("/api/v1/auth/register", json=payload)
@@ -149,18 +149,20 @@ async def test_change_password(client: AsyncClient):
     # Change password
     headers = {"Authorization": f"Bearer {access_token}"}
     change_payload = {
-        "old_password": "oldpassword123",
-        "new_password": "newpassword123"
+        "old_password": "OldPass123!",
+        "new_password": "NewPass123!",
     }
-    response = await client.post("/api/v1/auth/change-password", json=change_payload, headers=headers)
+    response = await client.post(
+        "/api/v1/auth/change-password", json=change_payload, headers=headers
+    )
     assert response.status_code == status.HTTP_200_OK
 
     # Try logging in with old password
-    login_old = {"email": "changepassword@stayease.com", "password": "oldpassword123"}
+    login_old = {"email": "changepassword@stayease.com", "password": "OldPass123!"}
     resp_old = await client.post("/api/v1/auth/login", json=login_old)
     assert resp_old.status_code == status.HTTP_401_UNAUTHORIZED
 
     # Try logging in with new password
-    login_new = {"email": "changepassword@stayease.com", "password": "newpassword123"}
+    login_new = {"email": "changepassword@stayease.com", "password": "NewPass123!"}
     resp_new = await client.post("/api/v1/auth/login", json=login_new)
     assert resp_new.status_code == status.HTTP_200_OK

@@ -15,6 +15,7 @@ import app.rooms.models  # noqa
 import app.bookings.models  # noqa
 import app.housekeeping.models  # noqa
 import app.payments.models  # noqa
+import app.invoices.models  # noqa
 
 config = context.config
 

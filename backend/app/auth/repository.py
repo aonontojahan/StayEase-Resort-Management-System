@@ -44,6 +44,40 @@ class UserRepository:
         await self.db.refresh(user)
         return user
 
+    async def get_by_id_full(self, user_id: uuid.UUID) -> Optional[User]:
+        result = await self.db.execute(
+            select(User).where(User.id == user_id).options(selectinload(User.role))
+        )
+        return result.scalar_one_or_none()
+
+    async def delete(self, user: User) -> None:
+        from app.bookings.models import Booking
+        from app.payments.models import Payment
+        from app.housekeeping.models import HousekeepingTask
+
+        await self.db.execute(
+            Booking.__table__.update()
+            .where(Booking.created_by_id == user.id)
+            .values(created_by_id=None)
+        )
+        await self.db.execute(
+            Payment.__table__.update()
+            .where(Payment.recorded_by_id == user.id)
+            .values(recorded_by_id=None)
+        )
+        await self.db.execute(
+            HousekeepingTask.__table__.update()
+            .where(HousekeepingTask.assigned_to_id == user.id)
+            .values(assigned_to_id=None)
+        )
+        await self.db.execute(
+            HousekeepingTask.__table__.update()
+            .where(HousekeepingTask.created_by_id == user.id)
+            .values(created_by_id=None)
+        )
+        await self.db.delete(user)
+        await self.db.flush()
+
     async def count(self) -> int:
         result = await self.db.execute(select(User))
         return len(result.scalars().all())

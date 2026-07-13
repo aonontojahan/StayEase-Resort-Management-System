@@ -1,4 +1,5 @@
 import logging
+import os
 import secrets
 import string
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -122,7 +123,7 @@ async def seed_db(db: AsyncSession):
         from app.auth.repository import UserRepository
         from app.core.security import get_password_hash
 
-        owner_email = "aonontojahan@gmail.com"
+        owner_email = os.environ.get("OWNER_EMAIL", "admin@stayease.com")
         owner_role = await role_repo.get_by_name("Resort Owner")
         if owner_role:
             user_repo = UserRepository(db)

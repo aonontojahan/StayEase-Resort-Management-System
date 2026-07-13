@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
 
     # Database
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/stayease"
+    DATABASE_URL: str = ""  # Must be set via .env; no fallback for security
 
     @field_validator("SECRET_KEY", mode="before")
     @classmethod

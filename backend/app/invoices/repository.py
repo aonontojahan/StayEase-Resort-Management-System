@@ -5,6 +5,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.bookings.models import Booking
 from app.invoices.models import Invoice, InvoiceItem, InvoiceStatus
 from app.invoices.schemas import InvoiceCreate
 
@@ -29,7 +30,7 @@ class InvoiceRepository:
             select(Invoice)
             .options(
                 selectinload(Invoice.items),
-                selectinload(Invoice.booking),
+                selectinload(Invoice.booking).selectinload(Booking.payments),
                 selectinload(Invoice.guest),
             )
             .order_by(Invoice.created_at.desc())
@@ -48,7 +49,7 @@ class InvoiceRepository:
             .where(Invoice.id == invoice_id)
             .options(
                 selectinload(Invoice.items),
-                selectinload(Invoice.booking),
+                selectinload(Invoice.booking).selectinload(Booking.payments),
                 selectinload(Invoice.guest),
             )
         )
@@ -60,7 +61,7 @@ class InvoiceRepository:
             .where(Invoice.booking_id == booking_id)
             .options(
                 selectinload(Invoice.items),
-                selectinload(Invoice.booking),
+                selectinload(Invoice.booking).selectinload(Booking.payments),
                 selectinload(Invoice.guest),
             )
             .order_by(Invoice.created_at.desc())
@@ -75,7 +76,7 @@ class InvoiceRepository:
             .where(Invoice.guest_id == guest_id)
             .options(
                 selectinload(Invoice.items),
-                selectinload(Invoice.booking),
+                selectinload(Invoice.booking).selectinload(Booking.payments),
                 selectinload(Invoice.guest),
             )
             .order_by(Invoice.created_at.desc())

@@ -1,3 +1,4 @@
+import uuid
 from typing import List
 from fastapi import APIRouter, Depends, status
 from fastapi.encoders import jsonable_encoder
@@ -9,7 +10,11 @@ from sqlalchemy.orm import selectinload
 from app.auth.dependencies import get_current_user, require_role
 from app.auth.models import User
 from app.auth.repository import RoleRepository, UserRepository
-from app.core.exceptions import ForbiddenException, BadRequestException
+from app.core.exceptions import (
+    ForbiddenException,
+    BadRequestException,
+    NotFoundException,
+)
 from app.core.pagination import PaginationParams
 from app.core.security import get_password_hash
 from app.auth.schemas import (
@@ -167,3 +172,47 @@ async def list_users(
             "Access-Control-Expose-Headers": "X-Total-Count",
         },
     )
+
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_200_OK)
+async def delete_user(
+    user_id: uuid.UUID,
+    current_user: User = require_role(["Resort Owner", "Manager"]),
+    db: AsyncSession = Depends(get_db),
+):
+    user_repo = UserRepository(db)
+    target = await user_repo.get_by_id_full(user_id)
+    if not target:
+        raise NotFoundException("User not found.")
+    if target.id == current_user.id:
+        raise BadRequestException("You cannot delete yourself.")
+
+    if current_user.role.name == "Manager":
+        if target.role.name == "Resort Owner":
+            raise ForbiddenException("Managers cannot delete the Resort Owner.")
+        if target.role.name == "Manager":
+            raise ForbiddenException("Managers cannot delete other Managers.")
+
+    from app.bookings.models import Booking
+    from app.invoices.models import Invoice
+
+    has_bookings = await db.execute(
+        select(Booking.id).where(Booking.guest_id == user_id).limit(1)
+    )
+    if has_bookings.scalar_one_or_none():
+        raise BadRequestException(
+            "Cannot delete this user because they have existing bookings. "
+            "Reassign or cancel the bookings first."
+        )
+    has_invoices = await db.execute(
+        select(Invoice.id).where(Invoice.guest_id == user_id).limit(1)
+    )
+    if has_invoices.scalar_one_or_none():
+        raise BadRequestException(
+            "Cannot delete this user because they have existing invoices. "
+            "Handle the invoices first."
+        )
+
+    await user_repo.delete(target)
+    await db.commit()
+    return {"detail": f"User '{target.full_name}' deleted successfully."}

@@ -106,7 +106,7 @@ export interface UserSimple {
 export interface Payment {
   id: string
   amount: number
-  payment_method: "Cash" | "Card" | "BankTransfer"
+  payment_method: "Cash" | "Card" | "BankTransfer" | "bKash" | "Nagad" | "Rocket"
   status: "Pending" | "Completed" | "Refunded"
   transaction_ref: string | null
   notes: string | null
@@ -158,6 +158,14 @@ export interface TaskCreate {
   description?: string
   priority?: string
   due_date?: string
+}
+
+export interface StripeIntent {
+  client_secret: string
+  amount: number
+  currency: string
+  payment_intent_id: string
+  is_mock: boolean
 }
 
 // ── Reports ──────────────────────────────────────────────────────────────

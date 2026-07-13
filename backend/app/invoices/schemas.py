@@ -51,6 +51,10 @@ class InvoiceRead(BaseModel):
     created_at: datetime
     updated_at: datetime
     items: List[InvoiceItemRead]
+    booking_total: Optional[float] = None
+    booking_paid: Optional[float] = None
+    guest_name: Optional[str] = None
+    guest_email: Optional[str] = None
 
 
 class InvoiceSummary(BaseModel):

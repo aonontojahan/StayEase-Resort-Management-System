@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react"
 import { api } from "@/services/api"
-import { Booking } from "@/types/api"
+import { Booking, StripeIntent } from "@/types/api"
 import { useToast } from "@/components/Toast"
 import { ConfirmModal, Modal } from "@/components/Modal"
 import { 
@@ -24,12 +24,15 @@ export const MyBookingsPage: React.FC = () => {
 
   // Payment Modal States
   const [payBooking, setPayBooking] = useState<Booking | null>(null)
+  const [payMethod, setPayMethod] = useState<"Card" | "bKash" | "Nagad" | "Rocket">("Card")
   const [cardNumber, setCardNumber] = useState("")
   const [cardExpiry, setCardExpiry] = useState("")
   const [cardCvc, setCardCvc] = useState("")
   const [cardName, setCardName] = useState("")
   const [paymentProcessing, setPaymentProcessing] = useState(false)
-  const [stripeIntent, setStripeIntent] = useState<any>(null)
+  const [stripeIntent, setStripeIntent] = useState<StripeIntent | null>(null)
+  const [senderPhone, setSenderPhone] = useState("")
+  const [transactionId, setTransactionId] = useState("")
 
   const fetchBookings = async () => {
     setLoading(true)
@@ -68,10 +71,13 @@ export const MyBookingsPage: React.FC = () => {
   const initiateBalancePayment = async (booking: Booking) => {
     try {
       setPayBooking(booking)
+      setPayMethod("Card")
       setCardNumber("")
       setCardExpiry("")
       setCardCvc("")
       setCardName("")
+      setSenderPhone("")
+      setTransactionId("")
       
       const intentRes = await api.post("/payments/stripe/create-intent", {
         booking_id: booking.id,
@@ -136,6 +142,47 @@ export const MyBookingsPage: React.FC = () => {
       value = value.substring(0, 2) + "/" + value.substring(2)
     }
     setCardExpiry(value)
+  }
+
+  const onMobileBankingPay = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!payBooking || !stripeIntent) return
+
+    if (!senderPhone.trim() || senderPhone.trim().length < 10) {
+      toastError("Please enter a valid sender phone number.")
+      return
+    }
+    if (!transactionId.trim()) {
+      toastError("Please enter the transaction ID from your payment.")
+      return
+    }
+
+    setPaymentProcessing(true)
+    try {
+      await api.post("/payments/mobile-banking", {
+        booking_id: payBooking.id,
+        amount: stripeIntent.amount,
+        payment_method: payMethod,
+        transaction_ref: transactionId.trim(),
+        sender_phone: senderPhone.trim(),
+        amount_type: "full",
+      })
+
+      toastSuccess(`${payMethod} payment recorded! Balance settled successfully.`)
+      setPayBooking(null)
+      setStripeIntent(null)
+      fetchBookings()
+    } catch (err: any) {
+      toastError(err.response?.data?.detail || "Payment failed. Please try again.")
+    } finally {
+      setPaymentProcessing(false)
+    }
+  }
+
+  const resortAccounts: Record<string, string> = {
+    bKash: import.meta.env.VITE_BKASH_NUMBER || "01XXX-XXXXXX",
+    Nagad: import.meta.env.VITE_NAGAD_NUMBER || "01XXX-XXXXXX",
+    Rocket: import.meta.env.VITE_ROCKET_NUMBER || "01XXX-XXXXXX",
   }
 
   const getCardBrand = () => {
@@ -267,7 +314,7 @@ export const MyBookingsPage: React.FC = () => {
           title="Settle Outstanding Balance" 
           onClose={() => setPayBooking(null)}
         >
-          <form onSubmit={onCompletePayment} className="space-y-5">
+          <form onSubmit={payMethod === "Card" ? onCompletePayment : onMobileBankingPay} className="space-y-5">
             {stripeIntent?.is_mock && (
               <div className="rounded-lg bg-amber-50 border border-amber-200/50 p-3.5 text-xs text-amber-800 space-y-1">
                 <p className="font-bold flex items-center gap-1">
@@ -296,90 +343,155 @@ export const MyBookingsPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Virtual Card Preview */}
-            <div className="relative h-44 rounded-xl bg-gradient-to-br from-emerald-600 via-teal-700 to-emerald-950 p-6 text-white shadow-lg flex flex-col justify-between overflow-hidden">
-              <div className="absolute right-0 bottom-0 opacity-10 font-bold text-[120px] leading-none pointer-events-none font-serif">SE</div>
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-[8px] tracking-widest uppercase opacity-75 font-mono">StayEase Resort Card</p>
-                  <p className="text-xs font-semibold opacity-90 mt-0.5">Booking Guarantee</p>
-                </div>
-                <span className="font-bold italic text-base tracking-wider bg-white/10 px-2.5 py-0.5 rounded backdrop-blur-sm">
-                  {getCardBrand() !== "Unknown" ? getCardBrand() : "Stripe"}
-                </span>
-              </div>
-              
-              <div className="text-xl tracking-[0.15em] font-mono my-2.5">
-                {cardNumber || "•••• •••• •••• ••••"}
-              </div>
-
-              <div className="flex justify-between items-end">
-                <div>
-                  <p className="text-[8px] tracking-wider uppercase opacity-60 font-mono">Card Holder</p>
-                  <p className="text-sm font-semibold tracking-wide truncate max-w-[200px]">{cardName.toUpperCase() || "YOUR NAME"}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[8px] tracking-wider uppercase opacity-60 font-mono">Expires</p>
-                  <p className="text-sm font-semibold font-mono">{cardExpiry || "MM/YY"}</p>
-                </div>
+            {/* Payment Method Selector */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-muted-foreground">Payment Method</label>
+              <div className="grid grid-cols-4 gap-2">
+                {(["Card", "bKash", "Nagad", "Rocket"] as const).map((m) => (
+                  <div
+                    key={m}
+                    onClick={() => setPayMethod(m)}
+                    className={`cursor-pointer rounded-lg border p-2.5 text-center transition-all ${
+                      payMethod === m
+                        ? "border-primary bg-primary/5 ring-1 ring-primary"
+                        : "border-border hover:bg-muted/30"
+                    }`}
+                  >
+                    <span className="text-xs font-bold">{m === "Card" ? "💳 Card" : `📱 ${m}`}</span>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* Input fields */}
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-muted-foreground">Cardholder Name</label>
-                <input 
-                  type="text" 
-                  value={cardName} 
-                  onChange={(e) => setCardName(e.target.value)} 
-                  placeholder="e.g. Ummay Salik Rumya"
-                  className="block w-full rounded-lg border bg-card py-2 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  required
-                />
-              </div>
+            {payMethod === "Card" ? (
+              <>
+                {/* Virtual Card Preview */}
+                <div className="relative h-44 rounded-xl bg-gradient-to-br from-emerald-600 via-teal-700 to-emerald-950 p-6 text-white shadow-lg flex flex-col justify-between overflow-hidden">
+                  <div className="absolute right-0 bottom-0 opacity-10 font-bold text-[120px] leading-none pointer-events-none font-serif">SE</div>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-[8px] tracking-widest uppercase opacity-75 font-mono">StayEase Resort Card</p>
+                      <p className="text-xs font-semibold opacity-90 mt-0.5">Booking Guarantee</p>
+                    </div>
+                    <span className="font-bold italic text-base tracking-wider bg-white/10 px-2.5 py-0.5 rounded backdrop-blur-sm">
+                      {getCardBrand() !== "Unknown" ? getCardBrand() : "Stripe"}
+                    </span>
+                  </div>
+                  
+                  <div className="text-xl tracking-[0.15em] font-mono my-2.5">
+                    {cardNumber || "•••• •••• •••• ••••"}
+                  </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-muted-foreground">Card Number</label>
-                <div className="relative">
-                  <input 
-                    type="text" 
-                    value={cardNumber} 
-                    onChange={handleCardNumberChange} 
-                    placeholder="4242 4242 4242 4242"
-                    className="block w-full rounded-lg border bg-card py-2 pl-3 pr-10 text-sm font-mono focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    required
-                  />
-                  <CreditCard className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-muted-foreground">Expiration Date</label>
-                  <input 
-                    type="text" 
-                    value={cardExpiry} 
-                    onChange={handleExpiryChange} 
-                    placeholder="MM/YY"
-                    className="block w-full rounded-lg border bg-card py-2 px-3 text-sm font-mono text-center focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    required
-                  />
+                  <div className="flex justify-between items-end">
+                    <div>
+                      <p className="text-[8px] tracking-wider uppercase opacity-60 font-mono">Card Holder</p>
+                      <p className="text-sm font-semibold tracking-wide truncate max-w-[200px]">{cardName.toUpperCase() || "YOUR NAME"}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[8px] tracking-wider uppercase opacity-60 font-mono">Expires</p>
+                      <p className="text-sm font-semibold font-mono">{cardExpiry || "MM/YY"}</p>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-muted-foreground">CVC / CVV</label>
-                  <input 
-                    type="password" 
-                    value={cardCvc} 
-                    onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, "").substring(0, 4))} 
-                    placeholder="•••"
-                    className="block w-full rounded-lg border bg-card py-2 px-3 text-sm font-mono text-center focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    required
-                  />
+                {/* Card Input fields */}
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-muted-foreground">Cardholder Name</label>
+                    <input 
+                      type="text" 
+                      value={cardName} 
+                      onChange={(e) => setCardName(e.target.value)} 
+                      placeholder="e.g. Ummay Salik Rumya"
+                      className="block w-full rounded-lg border bg-card py-2 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-muted-foreground">Card Number</label>
+                    <div className="relative">
+                      <input 
+                        type="text" 
+                        value={cardNumber} 
+                        onChange={handleCardNumberChange} 
+                        placeholder="4242 4242 4242 4242"
+                        className="block w-full rounded-lg border bg-card py-2 pl-3 pr-10 text-sm font-mono focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        required
+                      />
+                      <CreditCard className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-muted-foreground">Expiration Date</label>
+                      <input 
+                        type="text" 
+                        value={cardExpiry} 
+                        onChange={handleExpiryChange} 
+                        placeholder="MM/YY"
+                        className="block w-full rounded-lg border bg-card py-2 px-3 text-sm font-mono text-center focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-muted-foreground">CVC / CVV</label>
+                      <input 
+                        type="password" 
+                        value={cardCvc} 
+                        onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, "").substring(0, 4))} 
+                        placeholder="•••"
+                        className="block w-full rounded-lg border bg-card py-2 px-3 text-sm font-mono text-center focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        required
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              </>
+            ) : (
+              <>
+                {/* Mobile Banking Info */}
+                <div className="rounded-lg bg-blue-50 border border-blue-200/50 p-4 text-xs text-blue-800 space-y-2">
+                  <p className="font-bold flex items-center gap-1.5">
+                    <Info className="h-4 w-4 text-blue-600" /> 
+                    Pay via {payMethod}
+                  </p>
+                  <p>Send <strong>TK {stripeIntent?.amount?.toFixed(2)}</strong> to the StayEase Resort {payMethod} number below, then enter your details.</p>
+                  <div className="bg-white rounded border border-blue-100 p-2.5 text-center">
+                    <span className="text-xs text-muted-foreground">Resort {payMethod} Number:</span>
+                    <p className="text-base font-bold text-foreground tracking-wider mt-0.5">{resortAccounts[payMethod]}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-muted-foreground">Your {payMethod} Number (Sender)</label>
+                    <input 
+                      type="tel" 
+                      value={senderPhone} 
+                      onChange={(e) => setSenderPhone(e.target.value)} 
+                      placeholder="e.g. 01XXXXXXXXX"
+                      className="block w-full rounded-lg border bg-card py-2 px-3 text-sm font-mono focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-muted-foreground">Transaction ID (TrxID)</label>
+                    <input 
+                      type="text" 
+                      value={transactionId} 
+                      onChange={(e) => setTransactionId(e.target.value)} 
+                      placeholder="e.g. A7B8C9D0E1"
+                      className="block w-full rounded-lg border bg-card py-2 px-3 text-sm font-mono focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      required
+                    />
+                  </div>
+                </div>
+              </>
+            )}
 
             <div className="flex justify-end gap-3 pt-4 border-t">
               <button 
@@ -403,7 +515,7 @@ export const MyBookingsPage: React.FC = () => {
                 ) : (
                   <>
                     <CheckCircle2 className="h-4 w-4" />
-                    Authorize Settle Balance
+                    {payMethod === "Card" ? "Authorize Payment" : `Pay via ${payMethod}`}
                   </>
                 )}
               </button>

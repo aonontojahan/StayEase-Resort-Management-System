@@ -10,6 +10,7 @@ class BookingCreate(BaseModel):
     check_out_date: date
     num_guests: int = Field(1, ge=1)
     special_requests: Optional[str] = None
+    guest_id: Optional[uuid.UUID] = None  # Staff can set this for walk-in bookings
 
 
 class BookingStatusUpdate(BaseModel):
@@ -54,4 +55,3 @@ class BookingRead(BaseModel):
     room: RoomSimple
     created_at: datetime
     updated_at: datetime
-

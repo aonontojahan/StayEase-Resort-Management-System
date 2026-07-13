@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react"
 import { useAuth } from "@/store/AuthContext"
 import { api } from "@/services/api"
-import { OccupancyReport, BookingsSummary } from "@/types/api"
+import { OccupancyReport, BookingsSummary, RevenueReport } from "@/types/api"
 import { 
   Loader2, 
   Home, BookOpen, BedDouble, Users, Sparkles, CreditCard, FileText, Menu, X
@@ -23,7 +23,6 @@ import { UserMenu } from "@/components/UserMenu"
 import { NotificationBell } from "@/components/NotificationBell"
 import { EditProfileModal, SecurityModal } from "@/components/ProfileModals"
 
-
 export const Dashboard: React.FC = () => {
   const { user } = useAuth()
 
@@ -35,7 +34,7 @@ export const Dashboard: React.FC = () => {
   // Live stats & lists for ERP dashboard
   const [occupancy, setOccupancy] = useState<OccupancyReport | null>(null)
   const [bookingsSummary, setBookingsSummary] = useState<BookingsSummary | null>(null)
-  const [revenueReport, setRevenueReport] = useState<any[]>([])
+  const [revenueReport, setRevenueReport] = useState<RevenueReport[]>([])
   const [loadingDashboard, setLoadingDashboard] = useState(false)
 
   const fetchDashboardData = async () => {
@@ -45,13 +44,13 @@ export const Dashboard: React.FC = () => {
       const [occRes, summaryRes, revRes] = await Promise.all([
         api.get<OccupancyReport>("/reports/occupancy"),
         api.get<BookingsSummary>("/reports/bookings-summary"),
-        api.get<any[]>("/reports/revenue"),
+        api.get<RevenueReport[]>("/reports/revenue"),
       ])
       setOccupancy(occRes.data)
       setBookingsSummary(summaryRes.data)
       setRevenueReport(revRes.data)
-    } catch (err) {
-      console.error("Error loading ERP metrics", err)
+    } catch {
+      // Dashboard metrics error is non-critical; no user toast needed
     } finally {
       setLoadingDashboard(false)
     }
