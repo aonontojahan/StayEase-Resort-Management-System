@@ -30,6 +30,8 @@ export const PaymentsPage: React.FC = () => {
   const [createOpen, setCreateOpen] = useState(false)
   const [refundTarget, setRefundTarget] = useState<Payment | null>(null)
   const [refunding, setRefunding] = useState(false)
+  const [refundMethod, setRefundMethod] = useState("Stripe")
+  const [refundRef, setRefundRef] = useState("")
 
   const REFUND_ROLES = ["Resort Owner", "Manager", "Accountant"]
   const canRefund = user && REFUND_ROLES.includes(user.role.name)
@@ -83,12 +85,23 @@ export const PaymentsPage: React.FC = () => {
     if (!refundTarget) return
     setRefunding(true)
     try {
-      await api.patch(`/payments/${refundTarget.id}/refund`)
-      toastSuccess("Payment refunded successfully!")
+      const total = refundTarget.booking.total_amount
+      const cancellationFee = total * 0.30
+      const refundAmount = refundTarget.amount - cancellationFee
+
+      await api.post("/refunds/", {
+        payment_id: refundTarget.id,
+        amount: Math.max(0, refundAmount),
+        refund_method: refundMethod,
+        cancellation_fee: cancellationFee,
+        notes: refundRef ? `Ref: ${refundRef}` : undefined,
+      })
+      toastSuccess(`Refund of TK ${Math.max(0, refundAmount).toFixed(2)} initiated via ${refundMethod}.`)
       setRefundTarget(null)
+      setRefundRef("")
       fetchData()
     } catch (err: any) {
-      toastError(err.response?.data?.detail || "Failed to refund payment.")
+      toastError(err.response?.data?.detail || "Failed to process refund.")
     } finally {
       setRefunding(false)
     }
@@ -98,6 +111,7 @@ export const PaymentsPage: React.FC = () => {
     Completed: "bg-green-100 text-green-800",
     Pending: "bg-yellow-100 text-yellow-800",
     Refunded: "bg-red-100 text-red-800",
+    CancelledFee: "bg-purple-100 text-purple-800",
   }
 
   const METHOD_COLORS: Record<string, string> = {
@@ -263,32 +277,73 @@ export const PaymentsPage: React.FC = () => {
         </form>
       </Modal>
 
-      <Modal isOpen={!!refundTarget} title="Confirm Refund" onClose={() => !refunding && setRefundTarget(null)}>
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Are you sure you want to refund <strong>TK {refundTarget?.amount.toFixed(2)}</strong> for booking{" "}
-            <strong>{refundTarget?.booking.id}</strong>? This action cannot be undone.
-          </p>
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => setRefundTarget(null)}
-              disabled={refunding}
-              className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-secondary transition-colors disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={onRefund}
-              disabled={refunding}
-              className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors disabled:opacity-50"
-            >
-              {refunding && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              {refunding ? "Refunding..." : "Confirm Refund"}
-            </button>
+      <Modal isOpen={!!refundTarget} title="Process Refund" onClose={() => { if (!refunding) { setRefundTarget(null); setRefundRef("") }}}>
+        {refundTarget && (
+          <div className="space-y-5">
+            <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 space-y-2">
+              <div className="flex items-center gap-2 text-amber-700 font-semibold text-sm">
+                <Undo2 className="h-4 w-4" />
+                Cancellation Policy
+              </div>
+              <p className="text-sm text-amber-600">
+                30% cancellation fee (TK {(refundTarget.booking.total_amount * 0.30).toFixed(2)}) retained by resort.
+                70% refunded to guest: TK {Math.max(0, refundTarget.amount - refundTarget.booking.total_amount * 0.30).toFixed(2)}
+              </p>
+            </div>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Original Payment</span>
+                <span className="font-bold">TK {refundTarget.amount.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Fee (30%)</span>
+                <span className="font-bold text-destructive">- TK {(refundTarget.booking.total_amount * 0.30).toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between border-t pt-2 font-bold text-base">
+                <span>Net Refund</span>
+                <span className="text-emerald-600">TK {Math.max(0, refundTarget.amount - refundTarget.booking.total_amount * 0.30).toFixed(2)}</span>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-muted-foreground">Refund Method</label>
+              <select
+                value={refundMethod}
+                onChange={(e) => setRefundMethod(e.target.value)}
+                className="block w-full rounded-lg border bg-card py-2.5 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="Stripe">Stripe (Auto - goes back to card)</option>
+                <option value="Cash">Cash (Immediate)</option>
+                <option value="bKash">bKash (Manual)</option>
+                <option value="Nagad">Nagad (Manual)</option>
+                <option value="Rocket">Rocket (Manual)</option>
+                <option value="BankTransfer">Bank Transfer (Manual)</option>
+              </select>
+              {refundMethod !== "Stripe" && refundMethod !== "Cash" && (
+                <p className="text-[10px] text-amber-600 mt-1">Manual refund — mark as completed when money is sent.</p>
+              )}
+              {refundMethod === "Stripe" && (
+                <p className="text-[10px] text-emerald-600 mt-1">Automatic — refund will be processed via Stripe immediately.</p>
+              )}
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-muted-foreground">Reference (Optional)</label>
+              <input
+                value={refundRef}
+                onChange={(e) => setRefundRef(e.target.value)}
+                placeholder="e.g. refund TXN ID or notes"
+                className="block w-full rounded-lg border bg-card py-2.5 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-1">
+              <button onClick={() => { setRefundTarget(null); setRefundRef("") }} disabled={refunding} className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-secondary transition-colors disabled:opacity-50">Cancel</button>
+              <button onClick={onRefund} disabled={refunding} className="flex items-center gap-2 rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 hover:bg-destructive/90 transition-colors">
+                {refunding && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                <Undo2 className="h-3.5 w-3.5" />
+                {refundMethod === "Stripe" || refundMethod === "Cash" ? "Process Refund Now" : "Initiate Refund"}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </Modal>
     </div>
   )

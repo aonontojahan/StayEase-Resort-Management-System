@@ -8,7 +8,7 @@ import {
   CreditCard, CheckCircle2, Info, Lock, FileText,
   ShoppingCart, Trash2, Plus, Minus, ChevronRight,
   MapPin, Wifi, Tv, Snowflake, Coffee, Waves,
-  Dumbbell, Car, Shield
+  Dumbbell, Car
 } from "lucide-react"
 
 const ROOM_TYPE_IMAGES: Record<string, string> = {
