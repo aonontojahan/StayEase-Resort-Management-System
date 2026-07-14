@@ -5,6 +5,7 @@ import { AuthProvider } from "@/store/AuthContext"
 import { ToastProvider } from "@/components/Toast"
 import { ErrorBoundary } from "@/components/ErrorBoundary"
 import { ProtectedRoute, PublicRoute } from "@/components/RouteGuards"
+import { LandingPage } from "@/pages/LandingPage"
 import { Login } from "@/pages/Login"
 import { Register } from "@/pages/Register"
 import { Dashboard } from "@/pages/Dashboard"
@@ -43,9 +44,9 @@ export const App: React.FC = () => {
                   <Route path="/dashboard" element={<Dashboard />} />
                 </Route>
 
-                {/* Root redirects */}
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                {/* Public landing page */}
+                <Route path="/" element={<LandingPage />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </ErrorBoundary>
           </AuthProvider>
