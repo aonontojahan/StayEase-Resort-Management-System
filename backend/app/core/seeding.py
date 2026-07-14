@@ -144,9 +144,8 @@ async def seed_db(db: AsyncSession):
                 logger.info("=" * 60)
                 logger.info(f"DEFAULT RESORT OWNER CREATED:")
                 logger.info(f"  Email:    {owner_email}")
-                logger.info(f"  Password: {seed_password}")
                 logger.info(
-                    f"  IMPORTANT: Change this password immediately after first login!"
+                    f"  Credentials: Check .env file or contact system administrator."
                 )
                 logger.info("=" * 60)
             else:

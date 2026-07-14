@@ -5,7 +5,9 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.bookings.models import Booking, BookingStatus
+from sqlalchemy import delete as sa_delete
+
+from app.bookings.models import Booking, BookingRoom, BookingStatus
 from app.bookings.schemas import BookingCreate
 from app.rooms.models import Room
 
@@ -19,7 +21,9 @@ class BookingRepository:
             select(Booking)
             .options(
                 selectinload(Booking.guest),
-                selectinload(Booking.room).selectinload(Room.room_type),
+                selectinload(Booking.booking_rooms)
+                .selectinload(BookingRoom.room)
+                .selectinload(Room.room_type),
                 selectinload(Booking.created_by),
                 selectinload(Booking.payments),
             )
@@ -39,7 +43,9 @@ class BookingRepository:
             .where(Booking.id == booking_id)
             .options(
                 selectinload(Booking.guest),
-                selectinload(Booking.room).selectinload(Room.room_type),
+                selectinload(Booking.booking_rooms)
+                .selectinload(BookingRoom.room)
+                .selectinload(Room.room_type),
                 selectinload(Booking.created_by),
                 selectinload(Booking.payments),
             )
@@ -52,11 +58,13 @@ class BookingRepository:
         result = await self.db.execute(
             select(Booking)
             .where(
-                Booking.guest_id == guest_id, Booking.status != BookingStatus.pending
+                Booking.guest_id == guest_id, Booking.status != BookingStatus.cancelled
             )
             .options(
                 selectinload(Booking.guest),
-                selectinload(Booking.room).selectinload(Room.room_type),
+                selectinload(Booking.booking_rooms)
+                .selectinload(BookingRoom.room)
+                .selectinload(Room.room_type),
                 selectinload(Booking.payments),
             )
             .order_by(Booking.created_at.desc())
@@ -76,16 +84,22 @@ class BookingRepository:
         room_id: uuid.UUID,
         check_in: date,
         check_out: date,
-        exclude_id: Optional[uuid.UUID] = None,
+        exclude_booking_id: Optional[uuid.UUID] = None,
     ) -> bool:
-        query = select(Booking).where(
-            Booking.room_id == room_id,
-            Booking.status.in_([BookingStatus.confirmed, BookingStatus.checked_in]),
-            Booking.check_in_date < check_out,
-            Booking.check_out_date > check_in,
+        query = select(BookingRoom).where(
+            BookingRoom.room_id == room_id,
+            BookingRoom.status.in_(
+                [
+                    BookingStatus.pending,
+                    BookingStatus.confirmed,
+                    BookingStatus.checked_in,
+                ]
+            ),
+            BookingRoom.check_in_date < check_out,
+            BookingRoom.check_out_date > check_in,
         )
-        if exclude_id:
-            query = query.where(Booking.id != exclude_id)
+        if exclude_booking_id:
+            query = query.where(BookingRoom.booking_id != exclude_booking_id)
         result = await self.db.execute(query)
         return result.scalar_one_or_none() is not None
 
@@ -95,31 +109,53 @@ class BookingRepository:
         guest_id: uuid.UUID,
         created_by_id: uuid.UUID,
         total_amount: float,
-        status: BookingStatus = BookingStatus.pending,
     ) -> Booking:
         booking = Booking(
             guest_id=guest_id,
             created_by_id=created_by_id,
-            room_id=data.room_id,
-            check_in_date=data.check_in_date,
-            check_out_date=data.check_out_date,
-            num_guests=data.num_guests,
-            special_requests=data.special_requests,
             total_amount=total_amount,
-            status=status,
+            status=BookingStatus.pending,
         )
         self.db.add(booking)
         await self.db.flush()
+
+        for room_data in data.rooms:
+            nights = (room_data.check_out_date - room_data.check_in_date).days
+            booking_room = BookingRoom(
+                booking_id=booking.id,
+                room_id=room_data.room_id,
+                check_in_date=room_data.check_in_date,
+                check_out_date=room_data.check_out_date,
+                num_guests=room_data.num_guests,
+                special_requests=room_data.special_requests,
+                room_price_per_night=0,
+                total_amount=0,
+                status=BookingStatus.pending,
+            )
+            self.db.add(booking_room)
+        await self.db.flush()
+
         return await self.get_by_id(booking.id)
 
     async def update_status(
         self, booking: Booking, new_status: BookingStatus
     ) -> Booking:
         booking.status = new_status
+        for br in booking.booking_rooms:
+            br.status = new_status
         self.db.add(booking)
         await self.db.flush()
         return await self.get_by_id(booking.id)
 
     async def delete(self, booking: Booking) -> None:
+        from app.invoices.models import Invoice
+        from app.payments.models import Payment
+
+        await self.db.execute(
+            sa_delete(Invoice).where(Invoice.booking_id == booking.id)
+        )
+        await self.db.execute(
+            sa_delete(Payment).where(Payment.booking_id == booking.id)
+        )
         await self.db.delete(booking)
         await self.db.flush()

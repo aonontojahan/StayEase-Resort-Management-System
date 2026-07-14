@@ -71,18 +71,41 @@ class UserRead(UserBase):
     id: uuid.UUID
     is_active: bool
     is_verified: bool
+    nationality: Optional[str] = None
+    passport_or_nid: Optional[str] = None
     role: RoleRead
     created_at: datetime
     updated_at: datetime
 
 
 class UserUpdate(BaseModel):
-    email: Optional[EmailStr] = None
     full_name: Optional[str] = None
     phone_number: Optional[str] = None
-    password: Optional[str] = None
+
+
+class StaffUserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    phone_number: Optional[str] = None
     is_active: Optional[bool] = None
     is_verified: Optional[bool] = None
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=8, max_length=64)
+
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        return validate_password_strength(v)
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str
 
 
 class LoginRequest(BaseModel):

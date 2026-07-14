@@ -4,6 +4,8 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { api } from "@/services/api"
 import { Room, RoomType, RoomCreate, RoomUpdate, RoomTypeCreate } from "@/types/api"
+import { Pagination } from "@/components/Pagination"
+import { TableSkeleton } from "@/components/Skeleton"
 import { useToast } from "@/components/Toast"
 import { Modal, ConfirmModal } from "@/components/Modal"
 import {
@@ -31,6 +33,7 @@ const roomTypeSchema = z.object({
   description: z.string().optional(),
   base_price_per_night: z.coerce.number().min(1, "Price must be > 0"),
   max_occupancy: z.coerce.number().min(1, "Occupancy must be ≥ 1"),
+  image_urls: z.string().optional(),
 })
 
 const STATUS_COLORS: Record<string, string> = {
@@ -47,6 +50,10 @@ export const RoomsPage: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [filterStatus, setFilterStatus] = useState("")
+  const [page, setPage] = useState(1)
+  const [itemsPerPage] = useState(10)
+  const [totalItems, setTotalItems] = useState(0)
+  const totalPages = Math.ceil(totalItems / itemsPerPage)
 
   // Modal states
   const [createRoomOpen, setCreateRoomOpen] = useState(false)
@@ -57,16 +64,18 @@ export const RoomsPage: React.FC = () => {
   // Forms
   const createForm = useForm<RoomCreate>({ resolver: zodResolver(roomCreateSchema) })
   const editForm = useForm<RoomUpdate>({ resolver: zodResolver(roomUpdateSchema) })
-  const typeForm = useForm<RoomTypeCreate>({ resolver: zodResolver(roomTypeSchema) })
+  const typeForm = useForm<any>({ resolver: zodResolver(roomTypeSchema) })
 
-  const fetchData = async () => {
+  const fetchData = async (currentPage = page) => {
     setLoading(true)
+    const skip = (currentPage - 1) * itemsPerPage
     try {
       const [roomsRes, typesRes] = await Promise.all([
-        api.get<Room[]>("/rooms"),
+        api.get<Room[]>("/rooms", { params: { skip, limit: itemsPerPage } }),
         api.get<RoomType[]>("/room-types"),
       ])
       setRooms(roomsRes.data)
+      setTotalItems(parseInt(roomsRes.headers["x-total-count"] || "0", 10))
       setRoomTypes(typesRes.data)
     } catch {
       toastError("Failed to load rooms data.")
@@ -76,7 +85,7 @@ export const RoomsPage: React.FC = () => {
   }
 
   useEffect(() => {
-    fetchData()
+    fetchData(1)
   }, [])
 
   // Apply filters and sort rooms by number (ascending)
@@ -90,6 +99,11 @@ export const RoomsPage: React.FC = () => {
       return matchSearch && matchStatus
     })
     .sort((a, b) => a.room_number.localeCompare(b.room_number, undefined, { numeric: true }))
+
+  const onPageChange = (newPage: number) => {
+    setPage(newPage)
+    fetchData(newPage)
+  }
 
   // Create Room
   const onCreateRoom = async (data: RoomCreate) => {
@@ -142,9 +156,15 @@ export const RoomsPage: React.FC = () => {
   }
 
   // Create Room Type
-  const onCreateType = async (data: RoomTypeCreate) => {
+  const onCreateType = async (data: any) => {
     try {
-      await api.post("/room-types", data)
+      const payload: RoomTypeCreate = {
+        ...data,
+        image_urls: data.image_urls
+          ? data.image_urls.split(",").map((u: string) => u.trim()).filter(Boolean)
+          : [],
+      }
+      await api.post("/room-types", payload)
       toastSuccess("Room type created!")
       setCreateTypeOpen(false)
       typeForm.reset()
@@ -163,7 +183,7 @@ export const RoomsPage: React.FC = () => {
             <BedDouble className="h-7 w-7 text-primary" /> Rooms Management
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            {rooms.length} total rooms · {roomTypes.length} room types
+            {totalItems} total rooms · {roomTypes.length} room types
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -200,7 +220,7 @@ export const RoomsPage: React.FC = () => {
           <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); fetchData(1) }}
             placeholder="Search by room number or type..."
             className="w-full rounded-lg border bg-card py-2 pl-9 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
@@ -209,7 +229,7 @@ export const RoomsPage: React.FC = () => {
           <Filter className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <select
             value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
+            onChange={(e) => { setFilterStatus(e.target.value); setPage(1); fetchData(1) }}
             className="rounded-lg border bg-card py-2 pl-9 pr-8 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none"
           >
             <option value="">All Statuses</option>
@@ -228,9 +248,7 @@ export const RoomsPage: React.FC = () => {
       {/* Table */}
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         {loading ? (
-          <div className="p-12 text-center">
-            <Loader2 className="h-7 w-7 animate-spin mx-auto text-muted-foreground" />
-          </div>
+          <TableSkeleton rows={8} cols={6} />
         ) : filtered.length === 0 ? (
           <div className="p-12 text-center text-muted-foreground">
             <BedDouble className="h-10 w-10 mx-auto mb-3 opacity-30" />
@@ -288,6 +306,14 @@ export const RoomsPage: React.FC = () => {
               </tbody>
             </table>
           </div>
+        )}
+        {totalItems > itemsPerPage && (
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            onPageChange={onPageChange}
+          />
         )}
       </div>
 
@@ -382,23 +408,27 @@ export const RoomsPage: React.FC = () => {
           <div className="space-y-1">
             <label className="text-xs font-semibold text-muted-foreground">Type Name</label>
             <input {...typeForm.register("name")} className="block w-full rounded-lg border bg-card py-2 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" placeholder="e.g. Deluxe Suite" />
-            {typeForm.formState.errors.name && <p className="text-[10px] text-destructive">{typeForm.formState.errors.name.message}</p>}
+            {typeForm.formState.errors.name && <p className="text-[10px] text-destructive">{String(typeForm.formState.errors.name.message || "")}</p>}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-xs font-semibold text-muted-foreground">Price / Night (TK)</label>
               <input {...typeForm.register("base_price_per_night")} type="number" step="0.01" className="block w-full rounded-lg border bg-card py-2 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" />
-              {typeForm.formState.errors.base_price_per_night && <p className="text-[10px] text-destructive">{typeForm.formState.errors.base_price_per_night.message}</p>}
+              {typeForm.formState.errors.base_price_per_night && <p className="text-[10px] text-destructive">{String(typeForm.formState.errors.base_price_per_night.message || "")}</p>}
             </div>
             <div className="space-y-1">
               <label className="text-xs font-semibold text-muted-foreground">Max Occupancy</label>
               <input {...typeForm.register("max_occupancy")} type="number" className="block w-full rounded-lg border bg-card py-2 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" />
-              {typeForm.formState.errors.max_occupancy && <p className="text-[10px] text-destructive">{typeForm.formState.errors.max_occupancy.message}</p>}
+              {typeForm.formState.errors.max_occupancy && <p className="text-[10px] text-destructive">{String(typeForm.formState.errors.max_occupancy.message || "")}</p>}
             </div>
           </div>
           <div className="space-y-1">
             <label className="text-xs font-semibold text-muted-foreground">Description (optional)</label>
             <textarea {...typeForm.register("description")} rows={2} className="block w-full rounded-lg border bg-card py-2 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-muted-foreground">Image URLs (comma-separated, optional)</label>
+            <input {...typeForm.register("image_urls")} className="block w-full rounded-lg border bg-card py-2 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" placeholder="https://images.unsplash.com/photo-..." />
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => { setCreateTypeOpen(false); typeForm.reset() }} className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-secondary transition-colors">Cancel</button>

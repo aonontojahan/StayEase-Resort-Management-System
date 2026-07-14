@@ -1,4 +1,9 @@
+import csv
+import io
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
@@ -7,6 +12,7 @@ from app.auth.models import User
 from app.bookings.models import Booking, BookingStatus
 from app.core.database import get_db
 from app.payments.models import Payment, PaymentStatus
+from app.payments.repository import PaymentRepository
 from app.rooms.models import Room, RoomStatus
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
@@ -67,7 +73,7 @@ async def bookings_summary(
             select(func.count(Booking.id)).where(Booking.status == s)
         )
         results[s.value] = int(count_result.scalar() or 0)
-    
+
     total_result = await db.execute(select(func.count(Booking.id)))
     results["Total"] = int(total_result.scalar() or 0)
     return results
@@ -80,11 +86,12 @@ async def revenue_report(
 ):
     """Return monthly revenue data."""
     result = await db.execute(
-        select(Payment.created_at, Payment.amount)
-        .where(Payment.status == PaymentStatus.completed)
+        select(Payment.created_at, Payment.amount).where(
+            Payment.status == PaymentStatus.completed
+        )
     )
     rows = result.all()
-    
+
     monthly_data = {}
     for row in rows:
         if not row.created_at:
@@ -92,7 +99,7 @@ async def revenue_report(
         month_str = row.created_at.strftime("%Y-%m")
         if month_str not in monthly_data:
             monthly_data[month_str] = {"revenue": 0.0, "count": 0}
-        
+
         monthly_data[month_str]["revenue"] += float(row.amount or 0)
         monthly_data[month_str]["count"] += 1
 
@@ -105,3 +112,57 @@ async def revenue_report(
         }
         for m in sorted_months
     ]
+
+
+@router.get("/export/{report_type}")
+async def export_report(
+    report_type: str,
+    _: User = require_role(["Resort Owner", "Manager", "Accountant"]),
+    db: AsyncSession = Depends(get_db),
+):
+    pay_repo = PaymentRepository(db)
+    payments = await pay_repo.get_all(skip=0, limit=10000)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(
+        [
+            "Date",
+            "Booking ID",
+            "Guest",
+            "Amount",
+            "Method",
+            "Status",
+            "Transaction Ref",
+            "Recorded By",
+        ]
+    )
+
+    for p in payments:
+        writer.writerow(
+            [
+                p.created_at.strftime("%Y-%m-%d %H:%M")
+                if hasattr(p.created_at, "strftime")
+                else str(p.created_at),
+                str(p.booking_id),
+                p.booking.guest.full_name
+                if hasattr(p, "booking") and p.booking
+                else "",
+                f"{p.amount:.2f}",
+                p.payment_method,
+                p.status,
+                p.transaction_ref or "",
+                p.recorded_by.full_name
+                if hasattr(p, "recorded_by") and p.recorded_by
+                else "",
+            ]
+        )
+
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename=stayease-{report_type}-{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
+        },
+    )

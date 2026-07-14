@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import User
 from app.auth.repository import TokenBlacklistRepository, UserRepository
-from app.core.database import get_db
+from app.core.database import get_db, SessionLocal
 from app.core.exceptions import ForbiddenException, UnauthorizedException
 from app.core.security import decode_token
 
@@ -73,6 +73,25 @@ class PermissionChecker:
             if perm not in user_permissions:
                 raise ForbiddenException(f"Missing required permission: {perm}")
         return current_user
+
+
+async def get_current_user_ws(token: str) -> User | None:
+    payload = decode_token(token)
+    if not payload:
+        return None
+    user_id_str = payload.get("sub")
+    if not user_id_str:
+        return None
+    try:
+        user_uuid = uuid.UUID(user_id_str)
+    except ValueError:
+        return None
+    from app.auth.repository import UserRepository
+
+    async with SessionLocal() as db:
+        repo = UserRepository(db)
+        user = await repo.get_by_id(user_uuid)
+        return user
 
 
 def require_role(roles: Union[str, List[str]]):

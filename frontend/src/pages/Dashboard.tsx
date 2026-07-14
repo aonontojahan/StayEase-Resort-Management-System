@@ -4,7 +4,7 @@ import { api } from "@/services/api"
 import { OccupancyReport, BookingsSummary, RevenueReport } from "@/types/api"
 import { 
   Loader2, 
-  Home, BookOpen, BedDouble, Users, Sparkles, CreditCard, FileText, Menu, X
+  Home, BookOpen, BedDouble, Users, Sparkles, CreditCard, FileText, Menu, X, Settings
 } from "lucide-react"
 
 import { StaffManagement } from "@/components/StaffManagement"
@@ -19,6 +19,8 @@ import { MyBookingsPage } from "@/pages/MyBookingsPage"
 import { BrowseRoomsPage } from "@/pages/BrowseRoomsPage"
 import { PaymentHistoryPage } from "@/pages/PaymentHistoryPage"
 import { HousekeepingTasksPage } from "@/pages/HousekeepingTasksPage"
+import { SettingsPage } from "@/pages/SettingsPage"
+import { StatsGridSkeleton } from "@/components/Skeleton"
 import { UserMenu } from "@/components/UserMenu"
 import { NotificationBell } from "@/components/NotificationBell"
 import { EditProfileModal, SecurityModal } from "@/components/ProfileModals"
@@ -118,6 +120,10 @@ export const Dashboard: React.FC = () => {
             <FileText className="h-4 w-4" />
             <span>Invoices</span>
           </button>
+          <button onClick={() => handleTabChange("Settings")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Settings" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
+            <Settings className="h-4 w-4" />
+            <span>Settings</span>
+          </button>
         </>
       ) : user.role.name === "Guest" ? (
         <>
@@ -137,12 +143,20 @@ export const Dashboard: React.FC = () => {
             <FileText className="h-4 w-4" />
             <span>Invoices</span>
           </button>
+          <button onClick={() => handleTabChange("Settings")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Settings" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
+            <Settings className="h-4 w-4" />
+            <span>Settings</span>
+          </button>
         </>
       ) : user.role.name === "Housekeeping" ? (
         <>
           <button onClick={() => handleTabChange("Housekeeping Tasks")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Housekeeping Tasks" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
             <Sparkles className="h-4 w-4" />
             <span>Housekeeping Tasks</span>
+          </button>
+          <button onClick={() => handleTabChange("Settings")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Settings" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
+            <Settings className="h-4 w-4" />
+            <span>Settings</span>
           </button>
         </>
       ) : user.role.name === "Accountant" ? (
@@ -154,6 +168,10 @@ export const Dashboard: React.FC = () => {
           <button onClick={() => handleTabChange("Invoices")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Invoices" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
             <FileText className="h-4 w-4" />
             <span>Invoices</span>
+          </button>
+          <button onClick={() => handleTabChange("Settings")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Settings" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
+            <Settings className="h-4 w-4" />
+            <span>Settings</span>
           </button>
         </>
       ) : null}
@@ -171,42 +189,7 @@ export const Dashboard: React.FC = () => {
       case "Payments": return user.role.name === "Accountant" ? <AccountantPage /> : <PaymentsPage />
       case "Invoices": return <InvoicesPage />
       case "Settings":
-        return (
-          <div className="space-y-6 max-w-2xl">
-            <div>
-              <h2 className="text-2xl font-bold tracking-tight">Account Settings</h2>
-              <p className="text-sm text-muted-foreground">Manage your resort credentials and user profile information.</p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="rounded-xl border bg-card p-6 shadow-sm flex flex-col justify-between h-44">
-                <div>
-                  <h3 className="font-semibold text-base">Account Profile</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Update your full name, profile picture, phone number, and contact info.</p>
-                </div>
-                <button 
-                  onClick={() => setEditProfileOpen(true)}
-                  className="w-full mt-4 bg-primary text-primary-foreground text-xs font-semibold py-2 px-4 rounded-lg hover:bg-primary/90 transition-colors"
-                >
-                  Edit Profile Details
-                </button>
-              </div>
-
-              <div className="rounded-xl border bg-card p-6 shadow-sm flex flex-col justify-between h-44">
-                <div>
-                  <h3 className="font-semibold text-base">Security & Password</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Change your account password regularly to keep your resort logs safe.</p>
-                </div>
-                <button 
-                  onClick={() => setSecurityOpen(true)}
-                  className="w-full mt-4 bg-secondary text-secondary-foreground text-xs font-semibold py-2 px-4 rounded-lg hover:bg-secondary/80 transition-colors"
-                >
-                  Change Password
-                </button>
-              </div>
-            </div>
-          </div>
-        )
+        return <SettingsPage />
       case "My Bookings": return <MyBookingsPage />
       case "Browse Rooms": return <BrowseRoomsPage />
       case "Payment History": return <PaymentHistoryPage />
@@ -229,9 +212,7 @@ export const Dashboard: React.FC = () => {
             </div>
 
             {loadingDashboard ? (
-              <div className="flex items-center justify-center p-12">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              </div>
+              <StatsGridSkeleton />
             ) : (
               <>
                 {/* Metrics Cards Grid */}

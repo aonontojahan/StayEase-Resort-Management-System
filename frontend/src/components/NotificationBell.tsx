@@ -3,6 +3,7 @@ import { Bell, X, CheckCheck, BookOpen, CreditCard, Sparkles, AlertCircle, Info,
 import { api } from "@/services/api"
 import { useAuth } from "@/store/AuthContext"
 import { Booking, Payment, HousekeepingTask } from "@/types/api"
+import { useWebSocket } from "@/hooks/useWebSocket"
 
 // ─── Notification type ──────────────────────────────────────────────────────
 
@@ -61,7 +62,7 @@ function bookingToNotification(b: Booking): Notification {
     id: `booking-${b.id}`,
     type: isAlert ? "alert" : "booking",
     title: `Booking ${statusLabels[b.status] || b.status}`,
-    message: `${b.guest.full_name} — Room ${b.room.room_number} (${b.check_in_date} → ${b.check_out_date}). Total: TK ${b.total_amount.toFixed(0)}`,
+    message: `${b.guest.full_name} — Room ${b.booking_rooms.map(br => br.room.room_number).join(", ")} (${b.booking_rooms[0].check_in_date} → ${b.booking_rooms[0].check_out_date}). Total: TK ${b.total_amount.toFixed(0)}`,
     time: new Date(b.created_at),
     read: false,
   }
@@ -112,6 +113,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ className = 
   // Track IDs that have been seen so only *new* ones are marked unread
   const seenIdsRef = useRef<Set<string>>(new Set())
 
+  const { connected, onMessage } = useWebSocket("global")
   const unreadCount = notifications.filter((n) => !n.read).length
   const totalCount = notifications.length
 
@@ -208,6 +210,14 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ className = 
       if (pollRef.current) clearInterval(pollRef.current)
     }
   }, [fetchNotifications])
+
+  // Real-time updates via WebSocket
+  useEffect(() => {
+    const unsubscribe = onMessage("booking_update", () => {
+      fetchNotifications()
+    })
+    return unsubscribe
+  }, [onMessage, fetchNotifications])
 
   // Close panel on outside click
   useEffect(() => {

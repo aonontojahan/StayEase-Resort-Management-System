@@ -41,16 +41,15 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.limiter = limiter
 
     async def dispatch(self, request: Request, call_next):
-        if request.url.path.startswith("/api/v1/auth"):
-            client_ip = request.client.host if request.client else "unknown"
-            allowed, retry_after = await self.limiter.check(client_ip)
-            if not allowed:
-                return JSONResponse(
-                    status_code=429,
-                    content={
-                        "detail": f"Too many requests. Retry after {retry_after} seconds.",
-                        "status": "error",
-                    },
-                    headers={"Retry-After": str(retry_after)},
-                )
+        client_ip = request.client.host if request.client else "unknown"
+        allowed, retry_after = await self.limiter.check(client_ip)
+        if not allowed:
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "detail": f"Too many requests. Retry after {retry_after} seconds.",
+                    "status": "error",
+                },
+                headers={"Retry-After": str(retry_after)},
+            )
         return await call_next(request)

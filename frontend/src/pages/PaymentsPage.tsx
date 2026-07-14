@@ -4,10 +4,11 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { api } from "@/services/api"
 import { Payment, PaymentCreate, Booking, RevenueReport } from "@/types/api"
+import { useAuth } from "@/store/AuthContext"
 import { useToast } from "@/components/Toast"
 import { Modal } from "@/components/Modal"
 import {
-  CreditCard, Plus, Loader2, RefreshCw, Search, DollarSign, Activity
+  CreditCard, Plus, Loader2, RefreshCw, Search, DollarSign, Activity, Undo2
 } from "lucide-react"
 
 const paymentSchema = z.object({
@@ -20,12 +21,18 @@ const paymentSchema = z.object({
 
 export const PaymentsPage: React.FC = () => {
   const { toastSuccess, toastError } = useToast()
+  const { user } = useAuth()
   const [payments, setPayments] = useState<Payment[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
   const [revenue, setRevenue] = useState<RevenueReport[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [createOpen, setCreateOpen] = useState(false)
+  const [refundTarget, setRefundTarget] = useState<Payment | null>(null)
+  const [refunding, setRefunding] = useState(false)
+
+  const REFUND_ROLES = ["Resort Owner", "Manager", "Accountant"]
+  const canRefund = user && REFUND_ROLES.includes(user.role.name)
 
   const form = useForm<PaymentCreate>({ resolver: zodResolver(paymentSchema), defaultValues: { payment_method: "Card" } })
 
@@ -69,6 +76,21 @@ export const PaymentsPage: React.FC = () => {
       fetchData()
     } catch (err: any) {
       toastError(err.response?.data?.detail || "Failed to record payment.")
+    }
+  }
+
+  const onRefund = async () => {
+    if (!refundTarget) return
+    setRefunding(true)
+    try {
+      await api.patch(`/payments/${refundTarget.id}/refund`)
+      toastSuccess("Payment refunded successfully!")
+      setRefundTarget(null)
+      fetchData()
+    } catch (err: any) {
+      toastError(err.response?.data?.detail || "Failed to refund payment.")
+    } finally {
+      setRefunding(false)
     }
   }
 
@@ -156,6 +178,7 @@ export const PaymentsPage: React.FC = () => {
                   <th className="px-5 py-3">Status</th>
                   <th className="px-5 py-3">Ref</th>
                   <th className="px-5 py-3">Recorded By</th>
+                  <th className="px-5 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -176,6 +199,17 @@ export const PaymentsPage: React.FC = () => {
                     </td>
                     <td className="px-5 py-3.5 text-muted-foreground">{p.transaction_ref || "—"}</td>
                     <td className="px-5 py-3.5 text-muted-foreground">{p.recorded_by?.full_name || "—"}</td>
+                    <td className="px-5 py-3.5">
+                      {canRefund && p.status === "Completed" && (
+                        <button
+                          onClick={() => setRefundTarget(p)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+                        >
+                          <Undo2 className="h-3 w-3" />
+                          Refund
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -191,7 +225,7 @@ export const PaymentsPage: React.FC = () => {
             <select {...form.register("booking_id")} className="block w-full rounded-lg border bg-card py-2 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
               <option value="">Select booking...</option>
               {bookings.filter(b => b.status !== 'Cancelled').map((b) => (
-                <option key={b.id} value={b.id}>{b.guest.full_name} - {b.room.room_number} - Total: TK {b.total_amount}</option>
+                <option key={b.id} value={b.id}>{b.guest.full_name} - {b.booking_rooms.map(br => br.room.room_number).join(", ")} - Total: TK {b.total_amount}</option>
               ))}
             </select>
             {form.formState.errors.booking_id && <p className="text-[10px] text-destructive">{form.formState.errors.booking_id.message}</p>}
@@ -227,6 +261,34 @@ export const PaymentsPage: React.FC = () => {
             </button>
           </div>
         </form>
+      </Modal>
+
+      <Modal isOpen={!!refundTarget} title="Confirm Refund" onClose={() => !refunding && setRefundTarget(null)}>
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to refund <strong>TK {refundTarget?.amount.toFixed(2)}</strong> for booking{" "}
+            <strong>{refundTarget?.booking.id}</strong>? This action cannot be undone.
+          </p>
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setRefundTarget(null)}
+              disabled={refunding}
+              className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-secondary transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onRefund}
+              disabled={refunding}
+              className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+            >
+              {refunding && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {refunding ? "Refunding..." : "Confirm Refund"}
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   )

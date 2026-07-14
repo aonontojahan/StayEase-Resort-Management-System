@@ -2,9 +2,9 @@ import html
 import uuid
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user, require_role
@@ -15,6 +15,7 @@ from app.core.exceptions import BadRequestException, NotFoundException
 from app.core.pagination import PaginationParams
 from app.invoices.models import InvoiceStatus
 from app.invoices.repository import InvoiceRepository
+from app.invoices.pdf import generate_invoice_pdf
 from app.invoices.schemas import (
     InvoiceCreate,
     InvoiceRead,
@@ -418,8 +419,8 @@ async def get_invoice_html(
                 <p><strong>Number:</strong> {invoice.invoice_number}</p>
                 <p><strong>Issue Date:</strong> {invoice.issue_date.strftime("%b %d, %Y")}</p>
                 <p><strong>Due Date:</strong> {invoice.due_date.strftime("%b %d, %Y")}</p>
-                <p><strong>Room:</strong> {esc(booking.room.room_number)} ({esc(booking.room.room_type.name)})</p>
-                <p><strong>Stay:</strong> {booking.check_in_date.strftime("%b %d")} - {booking.check_out_date.strftime("%b %d, %Y")}</p>
+                <p><strong>Room(s):</strong> {esc(", ".join(br.room.room_number for br in booking.booking_rooms))}</p>
+                <p><strong>Stay:</strong> {booking.booking_rooms[0].check_in_date.strftime("%b %d")} - {booking.booking_rooms[0].check_out_date.strftime("%b %d, %Y")}</p>
             </div>
         </div>
 
@@ -476,6 +477,54 @@ async def get_invoice_html(
 </script>
 </body>
 </html>"""
+
+
+@router.get("/{invoice_id}/pdf")
+async def get_invoice_pdf(
+    invoice_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    repo = InvoiceRepository(db)
+    invoice = await repo.get_by_id(invoice_id)
+    if not invoice:
+        raise NotFoundException("Invoice not found")
+
+    if current_user.role.name == "Guest" and invoice.guest_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not your invoice")
+
+    items_data = [
+        {
+            "description": item.description,
+            "quantity": item.quantity,
+            "unit_price": float(item.unit_price),
+            "amount": float(item.amount),
+        }
+        for item in invoice.items
+    ]
+
+    pdf_bytes = generate_invoice_pdf(
+        invoice_id=str(invoice.id),
+        guest_name=invoice.guest.full_name,
+        guest_email=invoice.guest.email,
+        booking_id=str(invoice.booking_id),
+        items=items_data,
+        subtotal=float(invoice.subtotal),
+        tax_rate=float(invoice.tax_rate),
+        tax_amount=float(invoice.tax_amount),
+        total_amount=float(invoice.total_amount),
+        due_date=str(invoice.due_date),
+        status=invoice.status,
+        invoice_number=invoice.invoice_number,
+    )
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="invoice-{invoice.invoice_number}.pdf"'
+        },
+    )
 
 
 @router.post("/", response_model=InvoiceRead, status_code=status.HTTP_201_CREATED)

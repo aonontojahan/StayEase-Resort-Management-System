@@ -8,6 +8,8 @@ interface GuestSearchResult {
   email: string
   phone_number: string | null
 }
+import { Pagination } from "@/components/Pagination"
+import { TableSkeleton } from "@/components/Skeleton"
 import { useToast } from "@/components/Toast"
 import { ConfirmModal, Modal } from "@/components/Modal"
 import {
@@ -56,11 +58,18 @@ export const BookingsPage: React.FC = () => {
   const [walkinSubmitting, setWalkinSubmitting] = useState(false)
   const [walkinCreateNew, setWalkinCreateNew] = useState(false)
 
-  const fetchBookings = async () => {
+  const [page, setPage] = useState(1)
+  const [itemsPerPage] = useState(10)
+  const [totalItems, setTotalItems] = useState(0)
+  const totalPages = Math.ceil(totalItems / itemsPerPage)
+
+  const fetchBookings = async (currentPage = page) => {
     setLoading(true)
+    const skip = (currentPage - 1) * itemsPerPage
     try {
-      const res = await api.get<Booking[]>("/bookings/")
+      const res = await api.get<Booking[]>("/bookings/", { params: { skip, limit: itemsPerPage } })
       setBookings(res.data)
+      setTotalItems(parseInt(res.headers["x-total-count"] || "0", 10))
     } catch {
       toastError("Failed to load bookings.")
     } finally {
@@ -69,15 +78,16 @@ export const BookingsPage: React.FC = () => {
   }
 
   useEffect(() => {
-    fetchBookings()
+    fetchBookings(1)
   }, [])
 
   const filtered = bookings.filter((b) => {
+    const roomNumbers = b.booking_rooms.map(br => br.room.room_number).join(", ")
     const matchSearch =
       !search ||
       b.guest.full_name.toLowerCase().includes(search.toLowerCase()) ||
       b.guest.email.toLowerCase().includes(search.toLowerCase()) ||
-      b.room.room_number.toLowerCase().includes(search.toLowerCase())
+      roomNumbers.toLowerCase().includes(search.toLowerCase())
     const matchStatus = !filterStatus || b.status === filterStatus
     return matchSearch && matchStatus
   })
@@ -205,12 +215,14 @@ export const BookingsPage: React.FC = () => {
       }
 
       await api.post("/bookings/", {
-        room_id: walkinRoomId,
-        check_in_date: walkinCheckIn,
-        check_out_date: walkinCheckOut,
-        num_guests: walkinGuestsCount,
+        rooms: [{
+          room_id: walkinRoomId,
+          check_in_date: walkinCheckIn,
+          check_out_date: walkinCheckOut,
+          num_guests: walkinGuestsCount,
+        }],
         guest_id: guestId,
-      }, { params: { confirm_without_payment: true } })
+      })
 
       toastSuccess("Walk-in booking created successfully.")
       setShowWalkin(false)
@@ -234,9 +246,16 @@ export const BookingsPage: React.FC = () => {
     }
   }
 
+  const onPageChange = (newPage: number) => {
+    setPage(newPage)
+    fetchBookings(newPage)
+  }
+
   const nightCount = (b: Booking) => {
-    const ms = new Date(b.check_out_date).getTime() - new Date(b.check_in_date).getTime()
-    return Math.ceil(ms / 86400000)
+    if (b.booking_rooms.length === 0) return 0
+    const br = b.booking_rooms[0]
+    const ms = new Date(br.check_out_date).getTime() - new Date(br.check_in_date).getTime()
+    return Math.max(1, Math.ceil(ms / 86400000))
   }
 
   return (
@@ -246,7 +265,7 @@ export const BookingsPage: React.FC = () => {
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <BookOpen className="h-6 w-6 text-primary" /> Bookings Management
           </h2>
-          <p className="text-sm text-muted-foreground mt-0.5">{bookings.length} total bookings</p>
+          <p className="text-sm text-muted-foreground mt-0.5">{totalItems} total bookings</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={openWalkinModal} className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors">
@@ -262,7 +281,7 @@ export const BookingsPage: React.FC = () => {
         {STATUS_OPTIONS.map((s) => (
           <button
             key={s}
-            onClick={() => setFilterStatus(filterStatus === s ? "" : s)}
+            onClick={() => { setFilterStatus(filterStatus === s ? "" : s); setPage(1); fetchBookings(1) }}
             className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold border transition-all ${
               filterStatus === s ? STATUS_COLORS[s] + " border-transparent" : "bg-card border-border text-muted-foreground hover:bg-secondary"
             }`}
@@ -278,7 +297,7 @@ export const BookingsPage: React.FC = () => {
           <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); fetchBookings(1) }}
             placeholder="Search guest name, email, room..."
             className="w-full rounded-lg border bg-card py-2 pl-9 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
@@ -287,9 +306,7 @@ export const BookingsPage: React.FC = () => {
 
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         {loading ? (
-          <div className="p-12 text-center">
-            <Loader2 className="h-7 w-7 animate-spin mx-auto text-muted-foreground" />
-          </div>
+          <TableSkeleton rows={8} cols={8} />
         ) : filtered.length === 0 ? (
           <div className="p-12 text-center text-muted-foreground">
             <BookOpen className="h-10 w-10 mx-auto mb-3 opacity-30" />
@@ -320,11 +337,12 @@ export const BookingsPage: React.FC = () => {
                         <p className="text-xs text-muted-foreground">{b.guest.email}</p>
                       </td>
                       <td className="px-5 py-3.5">
-                        <p className="font-semibold">{b.room.room_number}</p>
-                        <p className="text-xs text-muted-foreground">{b.room.room_type.name}</p>
+                        {b.booking_rooms.map((br, i) => (
+                          <p key={i} className="font-semibold">{br.room.room_number} <span className="text-xs text-muted-foreground font-normal">({br.room.room_type.name})</span></p>
+                        ))}
                       </td>
-                      <td className="px-5 py-3.5">{b.check_in_date}</td>
-                      <td className="px-5 py-3.5">{b.check_out_date}</td>
+                      <td className="px-5 py-3.5">{b.booking_rooms[0]?.check_in_date || "-"}</td>
+                      <td className="px-5 py-3.5">{b.booking_rooms[0]?.check_out_date || "-"}</td>
                       <td className="px-5 py-3.5">{nightCount(b)}</td>
                       <td className="px-5 py-3.5">
                         <p className="font-semibold">TK {b.total_amount.toFixed(2)}</p>
@@ -385,6 +403,14 @@ export const BookingsPage: React.FC = () => {
               </tbody>
             </table>
           </div>
+        )}
+        {totalItems > itemsPerPage && (
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            onPageChange={onPageChange}
+          />
         )}
       </div>
 
@@ -509,8 +535,8 @@ export const BookingsPage: React.FC = () => {
                 <span className="font-semibold">{payBooking.guest.full_name}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Room:</span>
-                <span className="font-semibold">{payBooking.room.room_number} ({payBooking.room.room_type.name})</span>
+                <span className="text-muted-foreground">Rooms:</span>
+                <span className="font-semibold">{payBooking.booking_rooms.map(br => br.room.room_number).join(", ")}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Total:</span>

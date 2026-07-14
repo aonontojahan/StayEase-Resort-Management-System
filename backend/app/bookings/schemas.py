@@ -1,16 +1,20 @@
 import uuid
 from datetime import date, datetime
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class BookingCreate(BaseModel):
+class BookingRoomCreate(BaseModel):
     room_id: uuid.UUID
     check_in_date: date
     check_out_date: date
     num_guests: int = Field(1, ge=1)
     special_requests: Optional[str] = None
-    guest_id: Optional[uuid.UUID] = None  # Staff can set this for walk-in bookings
+
+
+class BookingCreate(BaseModel):
+    rooms: List[BookingRoomCreate] = Field(..., min_length=1)
+    guest_id: Optional[uuid.UUID] = None
 
 
 class BookingStatusUpdate(BaseModel):
@@ -41,17 +45,26 @@ class RoomSimple(BaseModel):
     room_type: RoomTypeSimple
 
 
-class BookingRead(BaseModel):
+class BookingRoomRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     check_in_date: date
     check_out_date: date
     num_guests: int
-    status: str
     special_requests: Optional[str] = None
+    room_price_per_night: float
+    total_amount: float
+    status: str
+    room: RoomSimple
+
+
+class BookingRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    status: str
     total_amount: float
     paid_amount: float
     guest: GuestRead
-    room: RoomSimple
+    booking_rooms: List[BookingRoomRead]
     created_at: datetime
     updated_at: datetime

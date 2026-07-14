@@ -78,12 +78,12 @@ class RoomRepository:
         return result.scalar_one_or_none()
 
     async def get_available(self, check_in: date, check_out: date) -> Sequence[Room]:
-        from app.bookings.models import Booking, BookingStatus
+        from app.bookings.models import BookingRoom, BookingStatus
 
-        booked_subq = select(Booking.room_id).where(
-            Booking.status.in_([BookingStatus.confirmed, BookingStatus.checked_in]),
-            Booking.check_in_date < check_out,
-            Booking.check_out_date > check_in,
+        booked_subq = select(BookingRoom.room_id).where(
+            BookingRoom.status.in_([BookingStatus.confirmed, BookingStatus.checked_in]),
+            BookingRoom.check_in_date < check_out,
+            BookingRoom.check_out_date > check_in,
         )
         result = await self.db.execute(
             select(Room)

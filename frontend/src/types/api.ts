@@ -68,27 +68,39 @@ export interface RoomSimple {
   room_type: RoomTypeSimple
 }
 
-export interface Booking {
+export interface BookingRoomRead {
   id: string
   check_in_date: string
   check_out_date: string
   num_guests: number
-  status: "Pending" | "Confirmed" | "CheckedIn" | "CheckedOut" | "Cancelled"
   special_requests: string | null
+  room_price_per_night: number
   total_amount: number
-  paid_amount: number
-  guest: GuestSimple
+  status: string
   room: RoomSimple
-  created_at: string
-  updated_at: string
 }
 
-export interface BookingCreate {
+export interface BookingRoomCreate {
   room_id: string
   check_in_date: string
   check_out_date: string
   num_guests: number
   special_requests?: string
+}
+
+export interface Booking {
+  id: string
+  status: "Pending" | "Confirmed" | "CheckedIn" | "CheckedOut" | "Cancelled"
+  total_amount: number
+  paid_amount: number
+  guest: GuestSimple
+  booking_rooms: BookingRoomRead[]
+  created_at: string
+  updated_at: string
+}
+
+export interface BookingCreate {
+  rooms: BookingRoomCreate[]
 }
 
 // ── Payments ──────────────────────────────────────────────────────────────

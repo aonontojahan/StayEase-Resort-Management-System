@@ -5,6 +5,7 @@ import { z } from "zod"
 import { api } from "@/services/api"
 import { HousekeepingTask, TaskCreate, Room } from "@/types/api"
 import { User } from "@/types/auth"
+import { TableSkeleton } from "@/components/Skeleton"
 import { useToast } from "@/components/Toast"
 import { Modal, ConfirmModal } from "@/components/Modal"
 import {
@@ -170,7 +171,7 @@ export const HousekeepingPage: React.FC = () => {
 
       {/* Task cards */}
       {loading ? (
-        <div className="p-12 text-center"><Loader2 className="h-7 w-7 animate-spin mx-auto text-muted-foreground" /></div>
+        <TableSkeleton rows={6} cols={4} />
       ) : filtered.length === 0 ? (
         <div className="p-12 text-center text-muted-foreground rounded-xl border bg-card">
           <Sparkles className="h-10 w-10 mx-auto mb-3 opacity-30" />

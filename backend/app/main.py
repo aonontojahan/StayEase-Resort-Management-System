@@ -1,8 +1,12 @@
+import os
 from contextlib import asynccontextmanager
 import logging
+
+import psutil
+import sentry_sdk
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from app.auth.router import router as auth_router
 from app.rooms.router import router as rooms_router
@@ -11,20 +15,29 @@ from app.housekeeping.router import router as housekeeping_router
 from app.payments.router import router as payments_router
 from app.reports.router import router as reports_router
 from app.invoices.router import router as invoices_router
+from app.uploads.router import router as uploads_router
 from app.core.config import settings
+from app.ws.router import router as ws_router
 from app.core.database import Base, engine, SessionLocal
 from app.core.exceptions import StayEaseException
 from app.core.logging import setup_logging
 from app.core.rate_limiter import RateLimitMiddleware, SlidingWindowRateLimiter
 from app.core.seeding import seed_db
+from app.monitoring.metrics import (
+    PrometheusMiddleware,
+    generate_latest,
+    CONTENT_TYPE_LATEST,
+    REGISTRY,
+)
 
 # Import all models so SQLAlchemy picks them up for create_all
 import app.auth.models  # noqa
 import app.rooms.models  # noqa
-import app.bookings.models  # noqa
+import app.bookings.models  # noqa  # also imports BookingRoom
 import app.housekeeping.models  # noqa
 import app.payments.models  # noqa
 import app.invoices.models  # noqa
+import app.audit.models  # noqa
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +74,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Sentry Initialization
+if settings.SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        environment=settings.ENVIRONMENT,
+        traces_sample_rate=0.1,
+    )
+    logger.info(f"Sentry initialized for environment: {settings.ENVIRONMENT}")
+
 # CORS Middleware Configuration
 app.add_middleware(
     CORSMiddleware,
@@ -77,6 +99,7 @@ rate_limiter = SlidingWindowRateLimiter(
     window_seconds=settings.RATE_LIMIT_WINDOW_SECONDS,
 )
 app.add_middleware(RateLimitMiddleware, limiter=rate_limiter)
+app.add_middleware(PrometheusMiddleware)
 
 
 # Global Custom Exception Handler
@@ -107,7 +130,21 @@ async def general_exception_handler(request: Request, exc: Exception):
 # Health check endpoint
 @app.get("/health", tags=["Health"])
 async def health_check():
-    return {"status": "healthy", "service": settings.PROJECT_NAME}
+    process = psutil.Process(os.getpid())
+    return {
+        "status": "healthy",
+        "service": settings.PROJECT_NAME,
+        "environment": settings.ENVIRONMENT,
+        "memory_mb": process.memory_info().rss / 1024 / 1024,
+        "cpu_percent": process.cpu_percent(interval=0.1),
+        "sentry_enabled": bool(settings.SENTRY_DSN),
+    }
+
+
+# Prometheus metrics endpoint
+@app.get("/metrics", tags=["Monitoring"])
+async def metrics():
+    return Response(content=generate_latest(REGISTRY), media_type=CONTENT_TYPE_LATEST)
 
 
 # Include all Routers
@@ -118,3 +155,5 @@ app.include_router(housekeeping_router, prefix=settings.API_V1_STR)
 app.include_router(payments_router, prefix=settings.API_V1_STR)
 app.include_router(reports_router, prefix=settings.API_V1_STR)
 app.include_router(invoices_router, prefix=settings.API_V1_STR)
+app.include_router(uploads_router, prefix=settings.API_V1_STR)
+app.include_router(ws_router, prefix=settings.API_V1_STR)

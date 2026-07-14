@@ -19,14 +19,17 @@ from app.core.pagination import PaginationParams
 from app.core.security import get_password_hash
 from app.auth.schemas import (
     ChangePasswordRequest,
+    ForgotPasswordRequest,
     LoginRequest,
     LogoutRequest,
     RefreshRequest,
+    ResetPasswordRequest,
     Token,
     UserCreate,
     UserCreateWithRole,
     UserRead,
     UserUpdate,
+    VerifyEmailRequest,
 )
 from app.auth.service import AuthService
 from app.core.database import get_db
@@ -89,9 +92,7 @@ async def update_current_user(
     db: AsyncSession = Depends(get_db),
 ):
     user_repo = UserRepository(db)
-    update_data = body.model_dump(
-        exclude_unset=True, exclude={"email", "password", "is_active", "is_verified"}
-    )
+    update_data = body.model_dump(exclude_unset=True)
     updated_user = await user_repo.update(current_user, update_data)
     result = await db.execute(
         select(User).where(User.id == updated_user.id).options(selectinload(User.role))
@@ -111,6 +112,46 @@ async def change_password(
         current_user, body.old_password, body.new_password
     )
     return {"detail": "Password updated successfully"}
+
+
+@router.post("/forgot-password", status_code=status.HTTP_200_OK)
+async def forgot_password(
+    body: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    auth_service = AuthService(db)
+    await auth_service.initiate_password_reset(body.email)
+    return {"detail": "If the email exists, a reset link has been sent."}
+
+
+@router.post("/reset-password", status_code=status.HTTP_200_OK)
+async def reset_password(
+    body: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    auth_service = AuthService(db)
+    await auth_service.reset_password(body.token, body.new_password)
+    return {"detail": "Password has been reset successfully."}
+
+
+@router.post("/verify-email", status_code=status.HTTP_200_OK)
+async def verify_email(
+    body: VerifyEmailRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    auth_service = AuthService(db)
+    await auth_service.verify_email(body.token)
+    return {"detail": "Email verified successfully."}
+
+
+@router.post("/resend-verification", status_code=status.HTTP_200_OK)
+async def resend_verification(
+    body: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    auth_service = AuthService(db)
+    await auth_service.resend_verification(body.email)
+    return {"detail": "If the email exists, a verification link has been sent."}
 
 
 @router.post("/logout", status_code=status.HTTP_200_OK)

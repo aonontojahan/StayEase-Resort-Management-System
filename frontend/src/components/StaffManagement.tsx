@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { api } from "@/services/api"
+import { TableSkeleton } from "@/components/Skeleton"
 import { Loader2, Plus, Trash2, Users } from "lucide-react"
 
 const userSchema = z.object({
@@ -148,7 +149,7 @@ export const StaffManagement: React.FC = () => {
         </div>
         <div className="overflow-x-auto">
           {loading ? (
-            <div className="p-8 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground"/></div>
+            <TableSkeleton rows={6} cols={5} />
           ) : (
             <table className="w-full text-sm text-left">
               <thead className="text-xs text-muted-foreground uppercase bg-muted/50 border-b">

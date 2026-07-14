@@ -73,6 +73,9 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: Optional[str] = None
     STRIPE_WEBHOOK_SECRET: Optional[str] = None
 
+    # Sentry Config
+    SENTRY_DSN: Optional[str] = None
+
     # SMTP / Email Config
     SMTP_HOST: Optional[str] = None
     SMTP_PORT: Optional[int] = None

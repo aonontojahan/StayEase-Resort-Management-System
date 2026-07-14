@@ -51,19 +51,16 @@ class PaymentStatusUpdate(BaseModel):
 
 class StripeIntentCreate(BaseModel):
     booking_id: uuid.UUID
-    amount_type: str  # "full" or "deposit"
 
 
 class StripePaymentConfirm(BaseModel):
     booking_id: uuid.UUID
     payment_intent_id: str
-    amount_type: str  # "full" or "deposit"
 
 
 class MobileBankingPayment(BaseModel):
     booking_id: uuid.UUID
     amount: float = Field(..., gt=0)
-    payment_method: str  # "bKash", "Nagad", "Rocket"
+    payment_method: str
     transaction_ref: str
     sender_phone: str
-    amount_type: str = "full"  # "full" or "deposit"

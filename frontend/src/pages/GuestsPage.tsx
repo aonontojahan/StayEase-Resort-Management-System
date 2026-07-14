@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react"
 import { api } from "@/services/api"
 import { User } from "@/types/auth"
+import { TableSkeleton } from "@/components/Skeleton"
 import { useToast } from "@/components/Toast"
 import { Users, Loader2, Search, RefreshCw, UserCheck, UserX } from "lucide-react"
 
@@ -93,9 +94,7 @@ export const GuestsPage: React.FC = () => {
       {/* Table */}
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         {loading ? (
-          <div className="p-12 text-center">
-            <Loader2 className="h-7 w-7 animate-spin mx-auto text-muted-foreground" />
-          </div>
+          <TableSkeleton rows={8} cols={6} />
         ) : filtered.length === 0 ? (
           <div className="p-12 text-center text-muted-foreground">
             <Users className="h-10 w-10 mx-auto mb-3 opacity-30" />

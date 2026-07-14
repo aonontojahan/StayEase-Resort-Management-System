@@ -2,7 +2,22 @@ import asyncio
 from typing import AsyncGenerator
 import pytest
 from httpx import AsyncClient, ASGITransport
+from sqlalchemy import JSON
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+
+@compiles(JSONB, "sqlite")
+def _compile_jsonb_sqlite(element, compiler, **kw):
+    return compiler.visit_JSON(element, **kw)
+
+
+# Disable rate limiting for tests
+from app.core import config as config_module
+
+config_module.settings.RATE_LIMIT_MAX_REQUESTS = 100000
+config_module.settings.RATE_LIMIT_WINDOW_SECONDS = 1
 
 from app.main import app
 from app.core.database import Base, get_db
@@ -17,9 +32,6 @@ engine_test = create_async_engine(
 TestingSessionLocal = async_sessionmaker(
     bind=engine_test, class_=AsyncSession, expire_on_commit=False
 )
-
-
-
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -48,6 +60,7 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 @pytest.fixture
 async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """Provide an HTTPX AsyncClient configured to request endpoints against the test database."""
+
     async def override_get_db():
         try:
             yield db_session
