@@ -215,6 +215,44 @@ async def list_users(
     )
 
 
+@router.patch("/users/{user_id}/deactivate", response_model=UserRead)
+async def deactivate_user(
+    user_id: uuid.UUID,
+    current_user: User = require_role(["Resort Owner", "Manager"]),
+    db: AsyncSession = Depends(get_db),
+):
+    user_repo = UserRepository(db)
+    target = await user_repo.get_by_id_full(user_id)
+    if not target:
+        raise NotFoundException("User not found.")
+    if target.id == current_user.id:
+        raise BadRequestException("You cannot deactivate yourself.")
+    update_data = {"is_active": False}
+    updated = await user_repo.update(target, update_data)
+    full = await db.execute(
+        select(User).where(User.id == updated.id).options(selectinload(User.role))
+    )
+    return UserRead.model_validate(full.scalar_one())
+
+
+@router.patch("/users/{user_id}/activate", response_model=UserRead)
+async def activate_user(
+    user_id: uuid.UUID,
+    current_user: User = require_role(["Resort Owner", "Manager"]),
+    db: AsyncSession = Depends(get_db),
+):
+    user_repo = UserRepository(db)
+    target = await user_repo.get_by_id_full(user_id)
+    if not target:
+        raise NotFoundException("User not found.")
+    update_data = {"is_active": True}
+    updated = await user_repo.update(target, update_data)
+    full = await db.execute(
+        select(User).where(User.id == updated.id).options(selectinload(User.role))
+    )
+    return UserRead.model_validate(full.scalar_one())
+
+
 @router.delete("/users/{user_id}", status_code=status.HTTP_200_OK)
 async def delete_user(
     user_id: uuid.UUID,

@@ -316,6 +316,19 @@ async def check_out_booking(
             ),
             created_by_id=current_user.id,
         )
+        try:
+            from app.ws.manager import manager
+
+            await manager.broadcast_to_room(
+                "housekeeping",
+                {
+                    "type": "housekeeping_task",
+                    "room_number": room_label,
+                    "room_type": room_type_name,
+                },
+            )
+        except Exception:
+            pass
 
     result = await repo.update_status(booking, BookingStatus.checked_out)
 

@@ -6,6 +6,7 @@ import { api } from "@/services/api"
 import { HousekeepingTask, TaskCreate, Room } from "@/types/api"
 import { User } from "@/types/auth"
 import { TableSkeleton } from "@/components/Skeleton"
+import { useWebSocket } from "@/hooks/useWebSocket"
 import { useToast } from "@/components/Toast"
 import { Modal, ConfirmModal } from "@/components/Modal"
 import {
@@ -44,6 +45,20 @@ export const HousekeepingPage: React.FC = () => {
   const [createOpen, setCreateOpen] = useState(false)
   const [deleteTask, setDeleteTask] = useState<HousekeepingTask | null>(null)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const { connected, onMessage } = useWebSocket("housekeeping")
+
+  useEffect(() => {
+    const unsubscribe = onMessage("housekeeping_task", () => {
+      fetchData()
+    })
+    return unsubscribe
+  }, [onMessage])
+
+  useEffect(() => {
+    if (connected) return
+    const interval = setInterval(fetchData, 60000)
+    return () => clearInterval(interval)
+  }, [connected])
 
   const form = useForm<TaskCreate>({ resolver: zodResolver(taskSchema), defaultValues: { priority: "Medium" } })
 
@@ -131,7 +146,14 @@ export const HousekeepingPage: React.FC = () => {
             <span className="ml-2 inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-semibold text-yellow-800">
               {tasks.filter(t => t.status === "Pending").length} pending
             </span>
-          )}</p>
+          )}
+            {connected && (
+              <span className="ml-2 inline-flex items-center gap-1 text-[10px] text-emerald-600 font-medium">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Live
+              </span>
+            )}
+          </p>
         </div>
         <div className="flex gap-2">
           <button onClick={fetchData} className="rounded-lg border p-2 hover:bg-secondary transition-colors" title="Refresh">

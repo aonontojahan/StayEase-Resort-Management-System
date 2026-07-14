@@ -10,6 +10,7 @@ interface ConfirmModalProps {
   onConfirm: () => void
   onCancel: () => void
   danger?: boolean
+  loading?: boolean
 }
 
 export const ConfirmModal: React.FC<ConfirmModalProps> = ({
@@ -21,6 +22,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   onConfirm,
   onCancel,
   danger = false,
+  loading = false,
 }) => {
   if (!isOpen) return null
 
@@ -60,13 +62,14 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           </button>
           <button
             onClick={onConfirm}
-            className={`rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors ${
+            disabled={loading}
+            className={`rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors disabled:opacity-50 ${
               danger
                 ? "bg-destructive hover:bg-destructive/90"
                 : "bg-primary hover:bg-primary/90"
             }`}
           >
-            {confirmLabel}
+            {loading ? "Loading..." : confirmLabel}
           </button>
         </div>
       </div>

@@ -52,7 +52,21 @@ async def create_task(
     db: AsyncSession = Depends(get_db),
 ):
     repo = HousekeepingRepository(db)
-    return await repo.create(data, current_user.id)
+    task = await repo.create(data, current_user.id)
+    try:
+        from app.ws.manager import manager
+
+        await manager.broadcast_to_room(
+            "housekeeping",
+            {
+                "type": "housekeeping_task",
+                "task_id": str(task.id),
+                "room_number": task.room.room_number if task.room else "Unknown",
+            },
+        )
+    except Exception:
+        pass
+    return task
 
 
 @router.patch("/{task_id}/status", response_model=TaskRead)

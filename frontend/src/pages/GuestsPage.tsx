@@ -3,14 +3,19 @@ import { api } from "@/services/api"
 import { User } from "@/types/auth"
 import { TableSkeleton } from "@/components/Skeleton"
 import { useToast } from "@/components/Toast"
-import { Users, Loader2, Search, RefreshCw, UserCheck, UserX } from "lucide-react"
+import { Users, Loader2, Search, RefreshCw, UserCheck, UserX, Trash2, UserMinus, UserPlus } from "lucide-react"
+import { useAuth } from "@/store/AuthContext"
+import { ConfirmModal } from "@/components/Modal"
 
 export const GuestsPage: React.FC = () => {
-  const { toastError } = useToast()
+  const { toastError, toastSuccess } = useToast()
+  const { user } = useAuth()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [filterRole, setFilterRole] = useState("")
+  const [deleteUser, setDeleteUser] = useState<User | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const fetchUsers = async () => {
     setLoading(true)
@@ -38,6 +43,32 @@ export const GuestsPage: React.FC = () => {
     const matchRole = !filterRole || u.role.name === filterRole
     return matchSearch && matchRole
   })
+
+  const toggleActive = async (u: User) => {
+    try {
+      const endpoint = u.is_active ? "deactivate" : "activate"
+      await api.patch(`/auth/users/${u.id}/${endpoint}`)
+      toastSuccess(`${u.full_name} ${u.is_active ? "deactivated" : "activated"}.`)
+      fetchUsers()
+    } catch (err: any) {
+      toastError(err.response?.data?.detail || "Failed to update user.")
+    }
+  }
+
+  const onDeleteUser = async () => {
+    if (!deleteUser) return
+    setDeleting(true)
+    try {
+      await api.delete(`/auth/users/${deleteUser.id}`)
+      toastSuccess(`User ${deleteUser.full_name} deleted.`)
+      setDeleteUser(null)
+      fetchUsers()
+    } catch (err: any) {
+      toastError(err.response?.data?.detail || "Failed to delete user.")
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   const ROLE_COLORS: Record<string, string> = {
     "Resort Owner": "bg-purple-100 text-purple-800",
@@ -111,6 +142,7 @@ export const GuestsPage: React.FC = () => {
                   <th className="px-5 py-3">Role</th>
                   <th className="px-5 py-3">Status</th>
                   <th className="px-5 py-3">Joined</th>
+                  <th className="px-5 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -145,6 +177,29 @@ export const GuestsPage: React.FC = () => {
                     <td className="px-5 py-3.5 text-muted-foreground text-xs">
                       {new Date(u.created_at).toLocaleDateString()}
                     </td>
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => toggleActive(u)}
+                          className={`rounded-lg border p-1.5 text-xs transition-colors ${
+                            u.is_active
+                              ? "text-red-600 hover:bg-red-50 border-red-200"
+                              : "text-green-600 hover:bg-green-50 border-green-200"
+                          }`}
+                          title={u.is_active ? "Deactivate user" : "Activate user"}
+                        >
+                          {u.is_active ? <UserMinus className="h-3.5 w-3.5" /> : <UserPlus className="h-3.5 w-3.5" />}
+                        </button>
+                        <button
+                          onClick={() => setDeleteUser(u)}
+                          disabled={u.id === user?.id}
+                          className="rounded-lg border border-red-200 p-1.5 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-30"
+                          title="Delete user"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -152,6 +207,17 @@ export const GuestsPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={!!deleteUser}
+        title="Delete User"
+        message={`Delete ${deleteUser?.full_name} (${deleteUser?.email})? This cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={onDeleteUser}
+        onCancel={() => setDeleteUser(null)}
+        danger
+        loading={deleting}
+      />
     </div>
   )
 }
