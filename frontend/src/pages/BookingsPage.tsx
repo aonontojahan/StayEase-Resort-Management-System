@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useRef, useState } from "react"
 import { api } from "@/services/api"
 import { Booking, Room } from "@/types/api"
 
@@ -13,7 +13,7 @@ import { TableSkeleton } from "@/components/Skeleton"
 import { useToast } from "@/components/Toast"
 import { ConfirmModal, Modal } from "@/components/Modal"
 import {
-  BookOpen, Loader2, RefreshCw, Search, ChevronDown, Trash2, CreditCard, CheckCircle2, UserPlus, Calendar, Users,
+  BookOpen, Loader2, RefreshCw, Search, ChevronDown, Trash2, CreditCard, CheckCircle2, UserPlus, Calendar, Users, LogIn, LogOut,
 } from "lucide-react"
 
 const STATUS_COLORS: Record<string, string> = {
@@ -25,6 +25,13 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 const STATUS_OPTIONS = ["Pending", "Confirmed", "CheckedIn", "CheckedOut", "Cancelled"]
+const STATUS_TRANSITIONS: Record<string, string[]> = {
+  Pending: ["Confirmed", "Cancelled"],
+  Confirmed: ["Cancelled"],
+  CheckedIn: ["Cancelled"],
+  CheckedOut: [],
+  Cancelled: [],
+}
 
 export const BookingsPage: React.FC = () => {
   const { toastSuccess, toastError } = useToast()
@@ -62,6 +69,7 @@ export const BookingsPage: React.FC = () => {
   const [itemsPerPage] = useState(10)
   const [totalItems, setTotalItems] = useState(0)
   const totalPages = Math.ceil(totalItems / itemsPerPage)
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>()
 
   const fetchBookings = async (currentPage = page) => {
     setLoading(true)
@@ -92,12 +100,7 @@ export const BookingsPage: React.FC = () => {
     return matchSearch && matchStatus
   })
 
-  const updateStatus = async (booking: Booking, status: string, e?: React.ChangeEvent<HTMLSelectElement>) => {
-    if (status === "CheckedIn" && booking.total_amount - booking.paid_amount > 0.01) {
-      openPayModal(booking)
-      if (e) e.target.value = ""
-      return
-    }
+  const updateStatus = async (booking: Booking, status: string) => {
     setUpdatingId(booking.id)
     try {
       await api.patch(`/bookings/${booking.id}/status`, { status })
@@ -105,6 +108,37 @@ export const BookingsPage: React.FC = () => {
       fetchBookings()
     } catch (err: any) {
       toastError(err.response?.data?.detail || "Failed to update status.")
+    } finally {
+      setUpdatingId(null)
+    }
+  }
+
+  const handleCheckIn = async (booking: Booking) => {
+    const due = booking.total_amount - booking.paid_amount
+    if (due > 0.01) {
+      openPayModal(booking)
+      return
+    }
+    setUpdatingId(booking.id)
+    try {
+      await api.post(`/bookings/${booking.id}/check-in`)
+      toastSuccess("Guest checked in successfully.")
+      fetchBookings()
+    } catch (err: any) {
+      toastError(err.response?.data?.detail || "Failed to check in.")
+    } finally {
+      setUpdatingId(null)
+    }
+  }
+
+  const handleCheckOut = async (booking: Booking) => {
+    setUpdatingId(booking.id)
+    try {
+      await api.post(`/bookings/${booking.id}/check-out`)
+      toastSuccess("Guest checked out successfully.")
+      fetchBookings()
+    } catch (err: any) {
+      toastError(err.response?.data?.detail || "Failed to check out.")
     } finally {
       setUpdatingId(null)
     }
@@ -133,7 +167,7 @@ export const BookingsPage: React.FC = () => {
         transaction_ref: payRef || undefined,
         notes: payNotes || undefined,
       })
-      await api.patch(`/bookings/${payBooking.id}/status`, { status: "CheckedIn" })
+      await api.post(`/bookings/${payBooking.id}/check-in`)
       toastSuccess(`Payment of TK ${payAmount.toFixed(2)} recorded. Guest checked in.`)
       setPayBooking(null)
       fetchBookings()
@@ -287,7 +321,6 @@ export const BookingsPage: React.FC = () => {
             }`}
           >
             {s}
-            <span className="font-bold">{bookings.filter((b) => b.status === s).length}</span>
           </button>
         ))}
       </div>
@@ -297,7 +330,7 @@ export const BookingsPage: React.FC = () => {
           <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); fetchBookings(1) }}
+            onChange={(e) => { setSearch(e.target.value); clearTimeout(searchTimerRef.current); searchTimerRef.current = setTimeout(() => { setPage(1); fetchBookings(1) }, 400) }}
             placeholder="Search guest name, email, room..."
             className="w-full rounded-lg border bg-card py-2 pl-9 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
@@ -365,19 +398,41 @@ export const BookingsPage: React.FC = () => {
                           {updatingId === b.id ? (
                             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                           ) : (
-                            <div className="relative">
-                              <select
-                                defaultValue=""
-                                onChange={(e) => { if (e.target.value) updateStatus(b, e.target.value, e) }}
-                                className="rounded-lg border bg-card py-1 pl-2 pr-7 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20 appearance-none cursor-pointer"
-                              >
-                                <option value="" disabled>Update status</option>
-                                {STATUS_OPTIONS.filter((s) => s !== b.status).map((s) => (
-                                  <option key={s} value={s}>{s}</option>
-                                ))}
-                              </select>
-                              <ChevronDown className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                            </div>
+                            <>
+                              {b.status === "Confirmed" && (
+                                <button
+                                  onClick={() => handleCheckIn(b)}
+                                  className="flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors"
+                                  title="Check in guest"
+                                >
+                                  <LogIn className="h-3 w-3" /> Check In
+                                </button>
+                              )}
+                              {b.status === "CheckedIn" && (
+                                <button
+                                  onClick={() => handleCheckOut(b)}
+                                  className="flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700 hover:bg-blue-100 transition-colors"
+                                  title="Check out guest"
+                                >
+                                  <LogOut className="h-3 w-3" /> Check Out
+                                </button>
+                              )}
+                              {STATUS_TRANSITIONS[b.status]?.length > 0 && (
+                                <div className="relative">
+                                  <select
+                                    defaultValue=""
+                                    onChange={(e) => { if (e.target.value) updateStatus(b, e.target.value) }}
+                                    className="rounded-lg border bg-card py-1 pl-2 pr-7 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20 appearance-none cursor-pointer"
+                                  >
+                                    <option value="" disabled>Update status</option>
+                                    {STATUS_TRANSITIONS[b.status].map((s) => (
+                                      <option key={s} value={s}>{s}</option>
+                                    ))}
+                                  </select>
+                                  <ChevronDown className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                                </div>
+                              )}
+                            </>
                           )}
                           {due > 0.01 && b.status !== "Cancelled" && b.status !== "CheckedOut" && (
                             <button

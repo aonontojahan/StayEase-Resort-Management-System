@@ -4,7 +4,8 @@ import { api } from "@/services/api"
 import { OccupancyReport, BookingsSummary, RevenueReport } from "@/types/api"
 import { 
   Loader2, 
-  Home, BookOpen, BedDouble, Users, Sparkles, CreditCard, FileText, Menu, X, Settings
+  Home, BookOpen, BedDouble, Users, Sparkles, CreditCard, FileText, Menu, X, Settings,
+  UserCheck, UserCircle, LogIn, LogOut
 } from "lucide-react"
 
 import { StaffManagement } from "@/components/StaffManagement"
@@ -92,10 +93,7 @@ export const Dashboard: React.FC = () => {
       )}
       {user.role.name === "Resort Owner" || user.role.name === "Manager" ? (
         <>
-          <button onClick={() => handleTabChange("Staff Management")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Staff Management" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
-            <Users className="h-4 w-4" />
-            <span>Staff Management</span>
-          </button>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground px-3 pt-3 pb-1">Operations</p>
           <button onClick={() => handleTabChange("Bookings")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Bookings" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
             <BookOpen className="h-4 w-4" />
             <span>Bookings</span>
@@ -105,13 +103,21 @@ export const Dashboard: React.FC = () => {
             <span>Rooms</span>
           </button>
           <button onClick={() => handleTabChange("Guests")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Guests" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
-            <Users className="h-4 w-4" />
+            <UserCircle className="h-4 w-4" />
             <span>Guests</span>
           </button>
+
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground px-3 pt-3 pb-1">Services</p>
           <button onClick={() => handleTabChange("Housekeeping")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Housekeeping" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
             <Sparkles className="h-4 w-4" />
             <span>Housekeeping</span>
           </button>
+          <button onClick={() => handleTabChange("Staff Management")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Staff Management" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
+            <UserCheck className="h-4 w-4" />
+            <span>Staff Management</span>
+          </button>
+
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground px-3 pt-3 pb-1">Finance</p>
           <button onClick={() => handleTabChange("Payments")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Payments" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
             <CreditCard className="h-4 w-4" />
             <span>Payments</span>
@@ -120,6 +126,8 @@ export const Dashboard: React.FC = () => {
             <FileText className="h-4 w-4" />
             <span>Invoices</span>
           </button>
+
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground px-3 pt-3 pb-1">System</p>
           <button onClick={() => handleTabChange("Settings")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Settings" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
             <Settings className="h-4 w-4" />
             <span>Settings</span>
@@ -261,6 +269,37 @@ export const Dashboard: React.FC = () => {
                     <p className="text-[10px] text-muted-foreground">
                       {occupancy?.cleaning || 0} cleaning · {occupancy?.maintenance || 0} maintenance
                     </p>
+                  </div>
+                </div>
+
+                {/* Quick Actions - Check-in/Check-out */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="rounded-xl border bg-card p-5 shadow-sm space-y-2 flex flex-col justify-between">
+                    <div>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                        <LogIn className="h-3 w-3" /> Pending Check-ins
+                      </p>
+                      <h3 className="text-2xl font-bold mt-1 text-indigo-600">{bookingsSummary?.Confirmed || 0}</h3>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">Awaiting arrival</p>
+                  </div>
+                  <div className="rounded-xl border bg-card p-5 shadow-sm space-y-2 flex flex-col justify-between">
+                    <div>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                        <BedDouble className="h-3 w-3" /> Active Stays
+                      </p>
+                      <h3 className="text-2xl font-bold mt-1 text-blue-600">{occupancy?.occupied || 0}</h3>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">Currently checked in</p>
+                  </div>
+                  <div className="rounded-xl border bg-card p-5 shadow-sm space-y-2 flex flex-col justify-between">
+                    <div>
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                        <LogOut className="h-3 w-3" /> Due Check-outs
+                      </p>
+                      <h3 className="text-2xl font-bold mt-1 text-amber-600">{bookingsSummary?.Pending || 0}</h3>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">Expected to depart today</p>
                   </div>
                 </div>
 

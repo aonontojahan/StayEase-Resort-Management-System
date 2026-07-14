@@ -7,7 +7,7 @@ import {
   BedDouble, Loader2, Search, Calendar, Users,
   CreditCard, CheckCircle2, Info, Lock, FileText,
   ShoppingCart, Trash2, Plus, Minus, ChevronRight,
-  MapPin, Wifi, Tv, Wind, Snowflake, Coffee, Waves,
+  MapPin, Wifi, Tv, Snowflake, Coffee, Waves,
   Dumbbell, Car, Shield
 } from "lucide-react"
 
@@ -43,6 +43,7 @@ interface CartItem {
   nights: number
   guests: number
   total: number
+  specialRequests?: string
 }
 
 export const BrowseRoomsPage: React.FC = () => {
@@ -57,6 +58,7 @@ export const BrowseRoomsPage: React.FC = () => {
 
   // Cart
   const [cart, setCart] = useState<CartItem[]>([])
+  const [specialRequestOpen, setSpecialRequestOpen] = useState<Record<string, boolean>>({})
 
   // Booking flow
   const [showCart, setShowCart] = useState(false)
@@ -153,6 +155,18 @@ export const BrowseRoomsPage: React.FC = () => {
     setCart(prev => prev.filter(item => item.room.id !== roomId))
   }
 
+  const updateCartGuests = (roomId: string, delta: number) => {
+    setCart(prev => prev.map(item => {
+      if (item.room.id !== roomId) return item
+      const newGuests = Math.max(1, Math.min(item.room.room_type.max_occupancy, item.guests + delta))
+      return {
+        ...item,
+        guests: newGuests,
+        total: item.room.room_type.base_price_per_night * item.nights * newGuests,
+      }
+    }))
+  }
+
   const cartTotal = cart.reduce((sum, item) => sum + item.total, 0)
 
   // Proceed to payment
@@ -170,6 +184,7 @@ export const BrowseRoomsPage: React.FC = () => {
           check_in_date: item.checkIn,
           check_out_date: item.checkOut,
           num_guests: item.guests,
+          special_requests: item.specialRequests || undefined,
         }))
       }
       const res = await api.post("/bookings/", bookingData)
@@ -297,9 +312,58 @@ export const BrowseRoomsPage: React.FC = () => {
               </div>
               <div className="flex items-center gap-4 text-xs text-muted-foreground">
                 <span><Calendar className="h-3 w-3 inline mr-1" />{item.checkIn} &rarr; {item.checkOut}</span>
-                <span><Users className="h-3 w-3 inline mr-1" />{item.guests} guest(s)</span>
+                <span className="flex items-center gap-1">
+                  <Users className="h-3 w-3" />
+                  <button
+                    onClick={() => updateCartGuests(item.room.id, -1)}
+                    disabled={item.guests <= 1}
+                    className="p-0.5 rounded hover:bg-muted disabled:opacity-30"
+                  >
+                    <Minus className="h-3 w-3" />
+                  </button>
+                  <span className="font-semibold text-foreground min-w-[1.5ch] text-center">{item.guests}</span>
+                  <button
+                    onClick={() => updateCartGuests(item.room.id, 1)}
+                    disabled={item.guests >= item.room.room_type.max_occupancy}
+                    className="p-0.5 rounded hover:bg-muted disabled:opacity-30"
+                  >
+                    <Plus className="h-3 w-3" />
+                  </button>
+                  <span>guest(s)</span>
+                </span>
               </div>
               <div className="text-right font-bold text-primary">TK {item.total.toFixed(2)}</div>
+              {specialRequestOpen[item.room.id] ? (
+                <div className="pt-1">
+                  <textarea
+                    value={item.specialRequests || ""}
+                    onChange={e => {
+                      const val = e.target.value.slice(0, 80)
+                      setCart(prev => prev.map(ci =>
+                        ci.room.id === item.room.id ? { ...ci, specialRequests: val } : ci
+                      ))
+                    }}
+                    placeholder="Any special requests? (max 80 chars)"
+                    className="block w-full rounded-lg border bg-muted/30 py-1.5 px-2.5 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20 resize-none"
+                    rows={2}
+                    maxLength={80}
+                  />
+                  <button
+                    onClick={() => setSpecialRequestOpen(prev => ({ ...prev, [item.room.id]: false }))}
+                    className="text-xs text-muted-foreground hover:text-foreground mt-1"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setSpecialRequestOpen(prev => ({ ...prev, [item.room.id]: true }))}
+                  className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
+                >
+                  <FileText className="h-3 w-3" />
+                  {item.specialRequests ? "Edit special request" : "Add special request"}
+                </button>
+              )}
             </div>
           ))
         )}
