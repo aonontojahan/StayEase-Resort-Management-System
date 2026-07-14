@@ -9,20 +9,22 @@ import { TableSkeleton } from "@/components/Skeleton"
 import { useWebSocket } from "@/hooks/useWebSocket"
 import { useToast } from "@/components/Toast"
 import { Modal, ConfirmModal } from "@/components/Modal"
+import { Badge } from "@/components/ui/Badge"
+import { Button } from "@/components/ui/Button"
 import {
   Sparkles, Plus, Loader2, RefreshCw, Search, Trash2, ChevronDown,
 } from "lucide-react"
 
-const STATUS_COLORS: Record<string, string> = {
-  Pending: "bg-yellow-100 text-yellow-800",
-  InProgress: "bg-blue-100 text-blue-800",
-  Done: "bg-green-100 text-green-800",
+const TASK_STATUS_VARIANT: Record<string, "warning" | "info" | "success"> = {
+  Pending: "warning",
+  InProgress: "info",
+  Done: "success",
 }
 
-const PRIORITY_COLORS: Record<string, string> = {
-  Low: "bg-gray-100 text-gray-600",
-  Medium: "bg-orange-100 text-orange-700",
-  High: "bg-red-100 text-red-700",
+const PRIORITY_VARIANT: Record<string, "neutral" | "warning" | "danger"> = {
+  Low: "neutral",
+  Medium: "warning",
+  High: "danger",
 }
 
 const taskSchema = z.object({
@@ -159,12 +161,9 @@ export const HousekeepingPage: React.FC = () => {
           <button onClick={fetchData} className="rounded-lg border p-2 hover:bg-secondary transition-colors" title="Refresh">
             <RefreshCw className="h-4 w-4 text-muted-foreground" />
           </button>
-          <button
-            onClick={() => setCreateOpen(true)}
-            className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors"
-          >
-            <Plus className="h-4 w-4" /> New Task
-          </button>
+          <Button icon={<Plus className="h-4 w-4" />} onClick={() => setCreateOpen(true)}>
+            New Task
+          </Button>
         </div>
       </div>
 
@@ -175,7 +174,11 @@ export const HousekeepingPage: React.FC = () => {
             key={s}
             onClick={() => setFilterStatus(filterStatus === s ? "" : s)}
             className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold border transition-all ${
-              filterStatus === s ? STATUS_COLORS[s] + " border-transparent" : "bg-card border-border text-muted-foreground hover:bg-secondary"
+              filterStatus === s
+                ? (s === "Pending" ? "bg-yellow-100 text-yellow-800" :
+                   s === "InProgress" ? "bg-blue-100 text-blue-800" :
+                   "bg-green-100 text-green-800") + " border-transparent"
+                : "bg-card border-border text-muted-foreground hover:bg-secondary"
             }`}
           >
             {s === "InProgress" ? "In Progress" : s}
@@ -225,12 +228,12 @@ export const HousekeepingPage: React.FC = () => {
               )}
 
               <div className="flex flex-wrap gap-2">
-                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_COLORS[task.status]}`}>
+                <Badge variant={TASK_STATUS_VARIANT[task.status] || "neutral"}>
                   {task.status === "InProgress" ? "In Progress" : task.status}
-                </span>
-                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${PRIORITY_COLORS[task.priority]}`}>
+                </Badge>
+                <Badge variant={PRIORITY_VARIANT[task.priority] || "neutral"}>
                   {task.priority}
-                </span>
+                </Badge>
               </div>
 
               {task.assigned_to && (
@@ -251,12 +254,14 @@ export const HousekeepingPage: React.FC = () => {
               ) : (
                 <div className="flex gap-2">
                   {task.status === "InProgress" && (
-                    <button
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={<Sparkles className="h-3 w-3" />}
                       onClick={() => updateStatus(task, "Done")}
-                      className="flex items-center gap-1 rounded-lg bg-green-100 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-200 transition-colors"
                     >
-                      <Sparkles className="h-3 w-3" /> Mark Done
-                    </button>
+                      Mark Done
+                    </Button>
                   )}
                   <div className="relative flex-1">
                     <select
@@ -326,11 +331,8 @@ export const HousekeepingPage: React.FC = () => {
             <textarea {...form.register("description")} rows={3} className="block w-full rounded-lg border bg-card py-2 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none" />
           </div>
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => { setCreateOpen(false); form.reset() }} className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-secondary transition-colors">Cancel</button>
-            <button type="submit" disabled={form.formState.isSubmitting} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50 hover:bg-primary/90 transition-colors">
-              {form.formState.isSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              Create Task
-            </button>
+            <Button variant="secondary" type="button" onClick={() => { setCreateOpen(false); form.reset() }}>Cancel</Button>
+            <Button type="submit" loading={form.formState.isSubmitting}>Create Task</Button>
           </div>
         </form>
       </Modal>

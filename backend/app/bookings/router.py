@@ -227,21 +227,38 @@ async def update_booking_status(
         from app.housekeeping.schemas import TaskCreate
 
         hk_repo = HousekeepingRepository(db)
+        assigned_hk_id = await hk_repo.find_least_busy_housekeeper()
         for br in booking.booking_rooms:
             room = await room_repo.get_by_id(br.room_id)
             room_label = room.room_number if room else br.room_id
             room_type_name = room.room_type.name if room else "Unknown"
             if room:
                 await room_repo.update(room, {"status": "Cleaning"})
-            await hk_repo.create(
+            task = await hk_repo.create(
                 TaskCreate(
                     room_id=br.room_id,
+                    assigned_to_id=assigned_hk_id,
                     title=f"Clean Room {room_label} after checkout",
                     description=f"Guest checked out. Booking #{str(booking.id)[:8]}. Room {room_label} ({room_type_name}).",
                     priority="Medium",
                 ),
                 created_by_id=current_user.id,
             )
+            try:
+                from app.ws.manager import manager
+
+                await manager.broadcast_to_room(
+                    "housekeeping",
+                    {
+                        "type": "housekeeping_task",
+                        "task_id": str(task.id),
+                        "room_number": room_label,
+                        "room_type": room_type_name,
+                        "assigned_to": str(assigned_hk_id) if assigned_hk_id else None,
+                    },
+                )
+            except Exception:
+                pass
 
     return await repo.update_status(booking, new_status)
 
@@ -301,15 +318,17 @@ async def check_out_booking(
     from app.housekeeping.schemas import TaskCreate
 
     hk_repo = HousekeepingRepository(db)
+    assigned_hk_id = await hk_repo.find_least_busy_housekeeper()
     for br in booking.booking_rooms:
         room = await room_repo.get_by_id(br.room_id)
         room_label = room.room_number if room else br.room_id
         room_type_name = room.room_type.name if room else "Unknown"
         if room:
             await room_repo.update(room, {"status": "Cleaning"})
-        await hk_repo.create(
+        task = await hk_repo.create(
             TaskCreate(
                 room_id=br.room_id,
+                assigned_to_id=assigned_hk_id,
                 title=f"Clean Room {room_label} after checkout",
                 description=f"Guest checked out. Booking #{str(booking.id)[:8]}. Room {room_label} ({room_type_name}).",
                 priority="Medium",
@@ -323,8 +342,10 @@ async def check_out_booking(
                 "housekeeping",
                 {
                     "type": "housekeeping_task",
+                    "task_id": str(task.id),
                     "room_number": room_label,
                     "room_type": room_type_name,
+                    "assigned_to": str(assigned_hk_id) if assigned_hk_id else None,
                 },
             )
         except Exception:

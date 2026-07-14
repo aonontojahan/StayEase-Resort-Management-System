@@ -4,11 +4,19 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict
 
 
+class RoomTypeSimple(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    name: str
+    base_price_per_night: float
+
+
 class RoomSimple(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     room_number: str
     floor: int
+    room_type: RoomTypeSimple
 
 
 class UserSimple(BaseModel):

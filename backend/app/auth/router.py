@@ -28,6 +28,7 @@ from app.auth.schemas import (
     UserCreate,
     UserCreateWithRole,
     UserRead,
+    UserRoleUpdate,
     UserUpdate,
     VerifyEmailRequest,
 )
@@ -295,3 +296,34 @@ async def delete_user(
     await user_repo.delete(target)
     await db.commit()
     return {"detail": f"User '{target.full_name}' deleted successfully."}
+
+
+@router.patch("/users/{user_id}/role", response_model=UserRead)
+async def change_user_role(
+    user_id: uuid.UUID,
+    body: UserRoleUpdate,
+    current_user: User = require_role(["Resort Owner", "Manager"]),
+    db: AsyncSession = Depends(get_db),
+):
+    user_repo = UserRepository(db)
+    role_repo = RoleRepository(db)
+
+    target = await user_repo.get_by_id_full(user_id)
+    if not target:
+        raise NotFoundException("User not found.")
+
+    new_role = await role_repo.get_by_name(body.role_name)
+    if not new_role:
+        raise BadRequestException(f"Role '{body.role_name}' does not exist.")
+
+    if current_user.role.name == "Manager" and new_role.name == "Resort Owner":
+        raise ForbiddenException("Managers cannot assign the Resort Owner role.")
+
+    if target.id == current_user.id:
+        raise BadRequestException("You cannot change your own role.")
+
+    updated = await user_repo.update(target, {"role_id": new_role.id})
+    full = await db.execute(
+        select(User).where(User.id == updated.id).options(selectinload(User.role))
+    )
+    return UserRead.model_validate(full.scalar_one())

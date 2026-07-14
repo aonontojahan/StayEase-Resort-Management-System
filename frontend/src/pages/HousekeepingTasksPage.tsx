@@ -2,18 +2,14 @@ import React, { useEffect, useState } from "react"
 import { api } from "@/services/api"
 import { HousekeepingTask } from "@/types/api"
 import { useToast } from "@/components/Toast"
+import { useWebSocket } from "@/hooks/useWebSocket"
+import { Badge } from "@/components/ui/Badge"
 import { Sparkles, Loader2, RefreshCw, ChevronDown } from "lucide-react"
 
-const STATUS_COLORS: Record<string, string> = {
-  Pending: "bg-yellow-100 text-yellow-800",
-  InProgress: "bg-blue-100 text-blue-800",
-  Done: "bg-green-100 text-green-800",
-}
-
-const PRIORITY_COLORS: Record<string, string> = {
-  Low: "bg-gray-100 text-gray-600",
-  Medium: "bg-orange-100 text-orange-700",
-  High: "bg-red-100 text-red-700",
+const PRIORITY_VARIANT: Record<string, "neutral" | "warning" | "danger"> = {
+  Low: "neutral",
+  Medium: "warning",
+  High: "danger",
 }
 
 export const HousekeepingTasksPage: React.FC = () => {
@@ -21,6 +17,20 @@ export const HousekeepingTasksPage: React.FC = () => {
   const [tasks, setTasks] = useState<HousekeepingTask[]>([])
   const [loading, setLoading] = useState(true)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const { connected, onMessage } = useWebSocket("housekeeping")
+
+  useEffect(() => {
+    const unsubscribe = onMessage("housekeeping_task", () => {
+      fetchTasks()
+    })
+    return unsubscribe
+  }, [onMessage])
+
+  useEffect(() => {
+    if (connected) return
+    const interval = setInterval(fetchTasks, 60000)
+    return () => clearInterval(interval)
+  }, [connected])
 
   const fetchTasks = async () => {
     setLoading(true)
@@ -58,7 +68,15 @@ export const HousekeepingTasksPage: React.FC = () => {
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <Sparkles className="h-6 w-6 text-primary" /> My Tasks
           </h2>
-          <p className="text-sm text-muted-foreground mt-0.5">Manage your assigned housekeeping duties.</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Manage your assigned housekeeping duties.
+            {connected && (
+              <span className="ml-2 inline-flex items-center gap-1 text-[10px] text-emerald-600 font-medium">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Live
+              </span>
+            )}
+          </p>
         </div>
         <button onClick={fetchTasks} className="rounded-lg border p-2 hover:bg-secondary transition-colors w-fit" title="Refresh">
           <RefreshCw className="h-4 w-4 text-muted-foreground" />
@@ -84,9 +102,9 @@ export const HousekeepingTasksPage: React.FC = () => {
                   <h3 className="font-bold text-lg leading-tight">{task.title}</h3>
                   <p className="text-sm text-primary font-medium mt-1">Room {task.room.room_number}</p>
                 </div>
-                <span className={`shrink-0 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${PRIORITY_COLORS[task.priority]}`}>
+                <Badge variant={PRIORITY_VARIANT[task.priority] || "neutral"}>
                   {task.priority}
-                </span>
+                </Badge>
               </div>
 
               {task.description && (
@@ -107,7 +125,11 @@ export const HousekeepingTasksPage: React.FC = () => {
                     <select
                       value={task.status}
                       onChange={(e) => updateStatus(task, e.target.value)}
-                      className={`w-full rounded-lg border py-2 pl-3 pr-8 text-sm font-semibold appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 ${STATUS_COLORS[task.status]}`}
+                      className={`w-full rounded-lg border py-2 pl-3 pr-8 text-sm font-semibold appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 ${
+                        task.status === "Pending" ? "bg-yellow-50 text-yellow-800" :
+                        task.status === "InProgress" ? "bg-blue-50 text-blue-800" :
+                        "bg-green-50 text-green-800"
+                      }`}
                     >
                       <option value="Pending">Pending</option>
                       <option value="InProgress">In Progress</option>

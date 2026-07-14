@@ -102,6 +102,35 @@ class HousekeepingRepository:
         await self.db.flush()
         return await self.get_by_id(task.id)
 
+    async def find_least_busy_housekeeper(self) -> Optional[uuid.UUID]:
+        from app.auth.models import User
+
+        result = await self.db.execute(
+            select(User.id).where(
+                User.role.has(name="Housekeeping"), User.is_active == True
+            )
+        )
+        housekeeper_ids = [row[0] for row in result.all()]
+        if not housekeeper_ids:
+            return None
+
+        least_busy = None
+        lowest_count = float("inf")
+        for hk_id in housekeeper_ids:
+            count_result = await self.db.execute(
+                select(func.count(HousekeepingTask.id)).where(
+                    HousekeepingTask.assigned_to_id == hk_id,
+                    HousekeepingTask.status.in_(
+                        [TaskStatus.pending, TaskStatus.in_progress]
+                    ),
+                )
+            )
+            count = int(count_result.scalar() or 0)
+            if count < lowest_count:
+                lowest_count = count
+                least_busy = hk_id
+        return least_busy
+
     async def delete(self, task: HousekeepingTask) -> None:
         await self.db.delete(task)
         await self.db.flush()

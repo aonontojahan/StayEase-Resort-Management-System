@@ -141,5 +141,9 @@ class ChangePasswordRequest(BaseModel):
         return validate_password_strength(v)
 
 
+class UserRoleUpdate(BaseModel):
+    role_name: str
+
+
 class LogoutRequest(BaseModel):
     refresh_token: str

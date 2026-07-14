@@ -5,7 +5,7 @@ import { OccupancyReport, BookingsSummary, RevenueReport } from "@/types/api"
 import { 
   Loader2, 
   Home, BookOpen, BedDouble, Users, Sparkles, CreditCard, FileText, Menu, X, Settings,
-  UserCheck, UserCircle, LogIn, LogOut
+  UserCheck, UserCircle, LogIn, LogOut, Sun, Moon
 } from "lucide-react"
 
 import { StaffManagement } from "@/components/StaffManagement"
@@ -25,9 +25,12 @@ import { StatsGridSkeleton } from "@/components/Skeleton"
 import { UserMenu } from "@/components/UserMenu"
 import { NotificationBell } from "@/components/NotificationBell"
 import { EditProfileModal, SecurityModal } from "@/components/ProfileModals"
+import { useDarkMode } from "@/hooks/useDarkMode"
+import { Badge } from "@/components/ui/Badge"
 
 export const Dashboard: React.FC = () => {
   const { user } = useAuth()
+  const { dark, toggle: toggleDark } = useDarkMode()
 
   const [activeTab, setActiveTab] = useState<string>("Dashboard")
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -420,7 +423,14 @@ export const Dashboard: React.FC = () => {
           </nav>
         </div>
 
-        <div className="border-t pt-4 mt-auto">
+        <div className="border-t pt-4 mt-auto space-y-3">
+          <button
+            onClick={toggleDark}
+            className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground transition-all"
+          >
+            {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            <span>{dark ? "Light Mode" : "Dark Mode"}</span>
+          </button>
           <UserMenu
             onEditProfile={() => setEditProfileOpen(true)}
             onSecurity={() => setSecurityOpen(true)}
@@ -453,7 +463,14 @@ export const Dashboard: React.FC = () => {
           </nav>
         </div>
 
-        <div className="border-t pt-4 mt-auto">
+        <div className="border-t pt-4 mt-auto space-y-3">
+          <button
+            onClick={toggleDark}
+            className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground transition-all"
+          >
+            {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            <span>{dark ? "Light Mode" : "Dark Mode"}</span>
+          </button>
           <UserMenu
             onEditProfile={() => { setEditProfileOpen(true); setMobileMenuOpen(false) }}
             onSecurity={() => { setSecurityOpen(true); setMobileMenuOpen(false) }}
@@ -472,9 +489,7 @@ export const Dashboard: React.FC = () => {
             <span className="text-sm font-semibold text-foreground">{activeTab}</span>
           </div>
           <div className="flex items-center gap-3 ml-auto">
-            <span className="hidden sm:inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-              {user.role.name}
-            </span>
+            <Badge className="hidden sm:inline-flex">{user.role.name}</Badge>
             <NotificationBell />
           </div>
         </header>

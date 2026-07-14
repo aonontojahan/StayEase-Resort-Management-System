@@ -3,9 +3,13 @@ import { api } from "@/services/api"
 import { User } from "@/types/auth"
 import { TableSkeleton } from "@/components/Skeleton"
 import { useToast } from "@/components/Toast"
-import { Users, Loader2, Search, RefreshCw, UserCheck, UserX, Trash2, UserMinus, UserPlus } from "lucide-react"
+import { Users, Loader2, Search, RefreshCw, UserCheck, UserX, Trash2, UserMinus, UserPlus, ChevronDown } from "lucide-react"
 import { useAuth } from "@/store/AuthContext"
 import { ConfirmModal } from "@/components/Modal"
+import { Badge } from "@/components/ui/Badge"
+import { EmptyState } from "@/components/ui/EmptyState"
+
+const ALL_ROLES = ["Resort Owner", "Manager", "Receptionist", "Housekeeping", "Accountant", "Guest"]
 
 export const GuestsPage: React.FC = () => {
   const { toastError, toastSuccess } = useToast()
@@ -16,6 +20,8 @@ export const GuestsPage: React.FC = () => {
   const [filterRole, setFilterRole] = useState("")
   const [deleteUser, setDeleteUser] = useState<User | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [editingRole, setEditingRole] = useState<string | null>(null)
+  const [changingRole, setChangingRole] = useState<string | null>(null)
 
   const fetchUsers = async () => {
     setLoading(true)
@@ -52,6 +58,24 @@ export const GuestsPage: React.FC = () => {
       fetchUsers()
     } catch (err: any) {
       toastError(err.response?.data?.detail || "Failed to update user.")
+    }
+  }
+
+  const onChangeRole = async (targetUser: User, newRole: string) => {
+    if (newRole === targetUser.role.name) {
+      setEditingRole(null)
+      return
+    }
+    setChangingRole(targetUser.id)
+    try {
+      await api.patch(`/auth/users/${targetUser.id}/role`, { role_name: newRole })
+      toastSuccess(`${targetUser.full_name} role changed to ${newRole}.`)
+      setEditingRole(null)
+      fetchUsers()
+    } catch (err: any) {
+      toastError(err.response?.data?.detail || "Failed to change role.")
+    } finally {
+      setChangingRole(null)
     }
   }
 
@@ -127,10 +151,7 @@ export const GuestsPage: React.FC = () => {
         {loading ? (
           <TableSkeleton rows={8} cols={6} />
         ) : filtered.length === 0 ? (
-          <div className="p-12 text-center text-muted-foreground">
-            <Users className="h-10 w-10 mx-auto mb-3 opacity-30" />
-            <p className="font-medium">No users found</p>
-          </div>
+          <EmptyState icon={<Users className="h-10 w-10" />} title="No users found" description="Try adjusting your search or filters." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
@@ -159,19 +180,42 @@ export const GuestsPage: React.FC = () => {
                     <td className="px-5 py-3.5 text-muted-foreground">{u.email}</td>
                     <td className="px-5 py-3.5 text-muted-foreground">{u.phone_number || "—"}</td>
                     <td className="px-5 py-3.5">
-                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${ROLE_COLORS[u.role.name] || "bg-gray-100 text-gray-700"}`}>
-                        {u.role.name}
-                      </span>
+                      {editingRole === u.id ? (
+                        <div className="relative inline-flex">
+                          <select
+                            value={u.role.name}
+                            disabled={changingRole === u.id}
+                            onChange={(e) => onChangeRole(u, e.target.value)}
+                            onBlur={() => setEditingRole(null)}
+                            autoFocus
+                            className="rounded-lg border bg-card py-1 pl-2 pr-7 text-xs font-semibold appearance-none cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
+                          >
+                            {ALL_ROLES.map((r) => (
+                              <option key={r} value={r}>{r}</option>
+                            ))}
+                          </select>
+                          <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                          {changingRole === u.id && <Loader2 className="absolute -right-5 top-1/2 -translate-y-1/2 h-3 w-3 animate-spin text-muted-foreground" />}
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setEditingRole(u.id)}
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold cursor-pointer hover:ring-2 hover:ring-primary/40 transition-all ${ROLE_COLORS[u.role.name] || "bg-gray-100 text-gray-700"}`}
+                          title="Click to change role"
+                        >
+                          {u.role.name}
+                        </button>
+                      )}
                     </td>
                     <td className="px-5 py-3.5">
                       {u.is_active ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700">
-                          <UserCheck className="h-3.5 w-3.5" /> Active
-                        </span>
+                        <Badge variant="success">
+                          <UserCheck className="h-3 w-3 mr-1" /> Active
+                        </Badge>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-600">
-                          <UserX className="h-3.5 w-3.5" /> Inactive
-                        </span>
+                        <Badge variant="neutral">
+                          <UserX className="h-3 w-3 mr-1" /> Inactive
+                        </Badge>
                       )}
                     </td>
                     <td className="px-5 py-3.5 text-muted-foreground text-xs">

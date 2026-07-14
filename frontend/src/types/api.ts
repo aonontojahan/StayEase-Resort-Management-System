@@ -13,7 +13,7 @@ export interface Room {
   id: string
   room_number: string
   floor: number
-  status: "Available" | "Occupied" | "Maintenance" | "Cleaning"
+  status: "Available" | "Occupied" | "Maintenance" | "Cleaning" | "Cleaned"
   notes: string | null
   room_type: RoomType
   room_type_id?: string
@@ -141,6 +141,7 @@ export interface HousekeepingRoomSimple {
   id: string
   room_number: string
   floor: number
+  room_type: { id: string; name: string; base_price_per_night: number }
 }
 
 export interface HousekeepingUserSimple {
