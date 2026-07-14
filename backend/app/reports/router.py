@@ -114,6 +114,51 @@ async def revenue_report(
     ]
 
 
+@router.get("/cancellation-fees")
+async def cancellation_fees_report(
+    _: User = require_role(ANALYTICS_ROLES),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return cancellation fee revenue data."""
+    result = await db.execute(
+        select(Payment).where(Payment.status == PaymentStatus.refunded)
+    )
+    payments = result.scalars().all()
+
+    total_fees = 0.0
+    fee_count = 0
+    monthly_data = {}
+
+    for p in payments:
+        cancellation_fee = float(p.cancellation_fee or 0)
+        if cancellation_fee <= 0:
+            cancellation_fee = float(p.booking.total_amount) * 0.30 if p.booking else 0
+
+        total_fees += cancellation_fee
+        fee_count += 1
+
+        if p.created_at:
+            month_str = p.created_at.strftime("%Y-%m")
+            if month_str not in monthly_data:
+                monthly_data[month_str] = {"fees": 0.0, "count": 0}
+            monthly_data[month_str]["fees"] += cancellation_fee
+            monthly_data[month_str]["count"] += 1
+
+    sorted_months = sorted(monthly_data.keys())
+    return {
+        "total_fees": total_fees,
+        "total_cancellations": fee_count,
+        "monthly": [
+            {
+                "month": m,
+                "fees": monthly_data[m]["fees"],
+                "count": monthly_data[m]["count"],
+            }
+            for m in sorted_months
+        ],
+    }
+
+
 @router.get("/export/{report_type}")
 async def export_report(
     report_type: str,

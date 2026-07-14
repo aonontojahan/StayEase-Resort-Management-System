@@ -121,5 +121,14 @@ class PaymentRepository:
         if not payment:
             return None
         payment.status = PaymentStatus.refunded
+        total = (
+            float(payment.booking.total_amount)
+            if payment.booking
+            else float(payment.amount)
+        )
+        cancellation_fee = total * 0.30
+        payment.cancellation_fee = cancellation_fee
+        payment.notes = f"Refunded (30% fee: TK {cancellation_fee:.2f})"
+        self.db.add(payment)
         await self.db.flush()
         return await self.get_by_id(payment_id)

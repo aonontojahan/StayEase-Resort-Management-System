@@ -23,6 +23,7 @@ class PaymentStatus(str, enum.Enum):
     pending = "Pending"
     completed = "Completed"
     refunded = "Refunded"
+    cancelled_fee = "CancelledFee"  # 30% fee retained by resort on cancellation
 
 
 class Payment(Base):
@@ -50,6 +51,9 @@ class Payment(Base):
     )
     transaction_ref: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    cancellation_fee: Mapped[Optional[float]] = mapped_column(
+        Numeric(10, 2), nullable=True, default=0
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

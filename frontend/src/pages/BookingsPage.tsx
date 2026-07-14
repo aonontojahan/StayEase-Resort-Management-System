@@ -13,7 +13,7 @@ import { TableSkeleton } from "@/components/Skeleton"
 import { useToast } from "@/components/Toast"
 import { ConfirmModal, Modal } from "@/components/Modal"
 import {
-  BookOpen, Loader2, RefreshCw, Search, ChevronDown, Trash2, CreditCard, CheckCircle2, UserPlus, Calendar, Users, LogIn, LogOut,
+  BookOpen, Loader2, RefreshCw, Search, ChevronDown, Trash2, CheckCircle2, UserPlus, Calendar, Users, LogIn, LogOut,
 } from "lucide-react"
 
 const STATUS_COLORS: Record<string, string> = {
@@ -41,13 +41,6 @@ export const BookingsPage: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState("")
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [deleteBooking, setDeleteBooking] = useState<Booking | null>(null)
-
-  const [payBooking, setPayBooking] = useState<Booking | null>(null)
-  const [payAmount, setPayAmount] = useState(0)
-  const [payMethod, setPayMethod] = useState("Cash")
-  const [payRef, setPayRef] = useState("")
-  const [payNotes, setPayNotes] = useState("")
-  const [payLoading, setPayLoading] = useState(false)
 
   // Walk-in booking state
   const [showWalkin, setShowWalkin] = useState(false)
@@ -114,11 +107,6 @@ export const BookingsPage: React.FC = () => {
   }
 
   const handleCheckIn = async (booking: Booking) => {
-    const due = booking.total_amount - booking.paid_amount
-    if (due > 0.01) {
-      openPayModal(booking)
-      return
-    }
     setUpdatingId(booking.id)
     try {
       await api.post(`/bookings/${booking.id}/check-in`)
@@ -141,40 +129,6 @@ export const BookingsPage: React.FC = () => {
       toastError(err.response?.data?.detail || "Failed to check out.")
     } finally {
       setUpdatingId(null)
-    }
-  }
-
-  const openPayModal = (booking: Booking) => {
-    setPayBooking(booking)
-    setPayAmount(booking.total_amount - booking.paid_amount)
-    setPayMethod("Cash")
-    setPayRef("")
-    setPayNotes("Check-in payment")
-  }
-
-  const onRecordPayment = async () => {
-    if (!payBooking) return
-    if (payAmount <= 0) {
-      toastError("Amount must be greater than zero.")
-      return
-    }
-    setPayLoading(true)
-    try {
-      await api.post("/payments/", {
-        booking_id: payBooking.id,
-        amount: payAmount,
-        payment_method: payMethod,
-        transaction_ref: payRef || undefined,
-        notes: payNotes || undefined,
-      })
-      await api.post(`/bookings/${payBooking.id}/check-in`)
-      toastSuccess(`Payment of TK ${payAmount.toFixed(2)} recorded. Guest checked in.`)
-      setPayBooking(null)
-      fetchBookings()
-    } catch (err: any) {
-      toastError(err.response?.data?.detail || "Failed to process payment.")
-    } finally {
-      setPayLoading(false)
     }
   }
 
@@ -248,7 +202,7 @@ export const BookingsPage: React.FC = () => {
         return
       }
 
-      await api.post("/bookings/", {
+      const bookingRes = await api.post("/bookings/", {
         rooms: [{
           room_id: walkinRoomId,
           check_in_date: walkinCheckIn,
@@ -257,8 +211,17 @@ export const BookingsPage: React.FC = () => {
         }],
         guest_id: guestId,
       })
+      const newBooking = bookingRes.data
 
-      toastSuccess("Walk-in booking created successfully.")
+      // Collect full payment at booking time
+      await api.post("/payments/", {
+        booking_id: newBooking.id,
+        amount: newBooking.total_amount,
+        payment_method: "Cash",
+        notes: "Walk-in full payment at booking",
+      })
+
+      toastSuccess("Walk-in booking created with full payment.")
       setShowWalkin(false)
       fetchBookings()
     } catch (err: any) {
@@ -434,15 +397,6 @@ export const BookingsPage: React.FC = () => {
                               )}
                             </>
                           )}
-                          {due > 0.01 && b.status !== "Cancelled" && b.status !== "CheckedOut" && (
-                            <button
-                              onClick={() => openPayModal(b)}
-                              className="flex items-center gap-1 rounded-lg border border-emerald-200 px-2 py-1 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors"
-                              title="Record payment"
-                            >
-                              <CreditCard className="h-3 w-3" /> Pay
-                            </button>
-                          )}
                           <button
                             onClick={() => setDeleteBooking(b)}
                             className="rounded-lg border p-1.5 text-muted-foreground hover:text-destructive hover:border-destructive/50 transition-colors"
@@ -581,100 +535,6 @@ export const BookingsPage: React.FC = () => {
         </form>
       </Modal>
 
-      <Modal isOpen={!!payBooking} title="Record Payment & Check In" onClose={() => setPayBooking(null)}>
-        {payBooking && (
-          <div className="space-y-5">
-            <div className="rounded-lg bg-muted/30 p-4 border text-sm space-y-2">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Guest:</span>
-                <span className="font-semibold">{payBooking.guest.full_name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Rooms:</span>
-                <span className="font-semibold">{payBooking.booking_rooms.map(br => br.room.room_number).join(", ")}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Total:</span>
-                <span className="font-semibold">TK {payBooking.total_amount.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Already Paid:</span>
-                <span className="font-semibold text-emerald-600">TK {payBooking.paid_amount.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between border-t pt-2 mt-2 font-bold text-base">
-                <span>Due Now:</span>
-                <span className="text-primary">TK {(payBooking.total_amount - payBooking.paid_amount).toFixed(2)}</span>
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-muted-foreground">Payment Amount (TK)</label>
-              <input
-                type="number" step="0.01"
-                value={payAmount}
-                onChange={(e) => setPayAmount(parseFloat(e.target.value) || 0)}
-                className="block w-full rounded-lg border bg-card py-2 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-muted-foreground">Payment Method</label>
-              <select
-                value={payMethod}
-                onChange={(e) => setPayMethod(e.target.value)}
-                className="block w-full rounded-lg border bg-card py-2 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-              >
-                <option>Cash</option>
-                <option>Card</option>
-                <option>BankTransfer</option>
-                <option>bKash</option>
-                <option>Nagad</option>
-                <option>Rocket</option>
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-muted-foreground">Reference (Optional)</label>
-              <input
-                value={payRef}
-                onChange={(e) => setPayRef(e.target.value)}
-                placeholder="e.g. TXN-12345"
-                className="block w-full rounded-lg border bg-card py-2 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-muted-foreground">Notes (Optional)</label>
-              <input
-                value={payNotes}
-                onChange={(e) => setPayNotes(e.target.value)}
-                placeholder="Check-in payment"
-                className="block w-full rounded-lg border bg-card py-2 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-              />
-            </div>
-
-            <div className="flex justify-end gap-3 pt-2 border-t">
-              <button
-                onClick={() => setPayBooking(null)}
-                className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-secondary transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={onRecordPayment}
-                disabled={payLoading}
-                className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50 hover:bg-primary/90 transition-colors"
-              >
-                {payLoading ? (
-                  <><Loader2 className="h-4 w-4 animate-spin" /> Processing...</>
-                ) : (
-                  <><CheckCircle2 className="h-4 w-4" /> Record Payment & Check In</>
-                )}
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
     </div>
   )
 }

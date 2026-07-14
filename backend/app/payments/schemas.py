@@ -33,6 +33,7 @@ class PaymentRead(BaseModel):
     status: str
     transaction_ref: Optional[str] = None
     notes: Optional[str] = None
+    cancellation_fee: Optional[float] = None
     booking: BookingSimple
     recorded_by: Optional[UserSimple] = None
     created_at: datetime

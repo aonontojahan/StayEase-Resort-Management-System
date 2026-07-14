@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from "react"
 import { api } from "@/services/api"
-import { Booking, StripeIntent } from "@/types/api"
+import { Booking } from "@/types/api"
 import { useToast } from "@/components/Toast"
 import { ConfirmModal, Modal } from "@/components/Modal"
 import {
-  BookOpen, Loader2, RefreshCw, XCircle, CreditCard,
-  CheckCircle2, Info, FileText, Calendar, Users, BedDouble, Trash2
+  BookOpen, Loader2, RefreshCw, XCircle,
+  Calendar, Users, BedDouble, Trash2
 } from "lucide-react"
 import { TableSkeleton } from "@/components/Skeleton"
 
@@ -23,17 +23,6 @@ export const MyBookingsPage: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [cancelBooking, setCancelBooking] = useState<Booking | null>(null)
   const [deleteBooking, setDeleteBooking] = useState<Booking | null>(null)
-
-  // Payment Modal
-  const [payBooking, setPayBooking] = useState<Booking | null>(null)
-  const [payMethod, setPayMethod] = useState<"Card" | "bKash" | "Nagad" | "Rocket">("Card")
-  const [cardLast4, setCardLast4] = useState("")
-  const [cardName, setCardName] = useState("")
-  const [paymentProcessing, setPaymentProcessing] = useState(false)
-  const [stripeIntent, setStripeIntent] = useState<StripeIntent | null>(null)
-  const [senderPhone, setSenderPhone] = useState("")
-  const [transactionId, setTransactionId] = useState("")
-  const [paymentInvoiceId, setPaymentInvoiceId] = useState<string | null>(null)
 
   const fetchBookings = async () => {
     setLoading(true)
@@ -77,78 +66,6 @@ export const MyBookingsPage: React.FC = () => {
 
   const getRemaining = (b: Booking) => b.total_amount - b.paid_amount
 
-  const initiateBalancePayment = async (booking: Booking) => {
-    try {
-      setPayBooking(booking)
-      setPaymentInvoiceId(null)
-      setPayMethod("Card")
-      setCardLast4("")
-      setCardName("")
-      setSenderPhone("")
-      setTransactionId("")
-
-      const intentRes = await api.post("/payments/stripe/create-intent", {
-        booking_id: booking.id,
-      })
-      setStripeIntent(intentRes.data)
-    } catch (err: any) {
-      toastError(err.response?.data?.detail || "Failed to initiate payment.")
-      setPayBooking(null)
-    }
-  }
-
-  const onCompletePayment = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!payBooking || !stripeIntent) return
-
-    if (payMethod === "Card") {
-      if (cardLast4.replace(/\D/g, "").length !== 4) { toastError("Please enter the last 4 digits of your card."); return }
-      if (!cardName.trim()) { toastError("Cardholder name required."); return }
-    } else {
-      if (!senderPhone.trim() || senderPhone.trim().length < 10) { toastError("Valid sender phone required."); return }
-      if (!transactionId.trim()) { toastError("Transaction ID required."); return }
-    }
-
-    setPaymentProcessing(true)
-    try {
-      if (payMethod === "Card") {
-        const res = await api.post("/payments/stripe/confirm", {
-          booking_id: payBooking.id,
-          payment_intent_id: stripeIntent.payment_intent_id,
-        })
-        setPaymentInvoiceId(res.data?.invoice_id || null)
-      } else {
-        const res = await api.post("/payments/mobile-banking", {
-          booking_id: payBooking.id,
-          amount: stripeIntent.amount,
-          payment_method: payMethod,
-          transaction_ref: transactionId.trim(),
-          sender_phone: senderPhone.trim(),
-        })
-        setPaymentInvoiceId(res.data?.invoice_id || null)
-      }
-      toastSuccess("Balance paid successfully!")
-      setPayBooking(null)
-      setStripeIntent(null)
-      fetchBookings()
-    } catch (err: any) {
-      toastError(err.response?.data?.detail || "Payment failed.")
-    } finally {
-      setPaymentProcessing(false)
-    }
-  }
-
-  const openInvoice = (invId: string) => {
-    const token = localStorage.getItem("accessToken")
-    window.open(`${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/invoices/${invId}/html?token=${token}`, "_blank")
-  }
-
-  const resortAccounts: Record<string, string> = {
-    bKash: import.meta.env.VITE_BKASH_NUMBER || "01XXX-XXXXXX",
-    Nagad: import.meta.env.VITE_NAGAD_NUMBER || "01XXX-XXXXXX",
-    Rocket: import.meta.env.VITE_ROCKET_NUMBER || "01XXX-XXXXXX",
-  }
-
   return (
     <div className="space-y-8 max-w-5xl">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between border-b pb-4">
@@ -162,18 +79,6 @@ export const MyBookingsPage: React.FC = () => {
           <RefreshCw className="h-4 w-4 text-muted-foreground" />
         </button>
       </div>
-
-      {paymentInvoiceId && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 flex items-center justify-between shadow-sm">
-          <div>
-            <p className="text-sm font-bold text-emerald-800">Payment successful!</p>
-            <p className="text-xs text-emerald-600">Your invoice is ready.</p>
-          </div>
-          <button onClick={() => { openInvoice(paymentInvoiceId); setPaymentInvoiceId(null) }} className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 transition-colors">
-            <FileText className="h-4 w-4" /> Download Invoice
-          </button>
-        </div>
-      )}
 
       {loading ? (
         <TableSkeleton rows={4} cols={1} />
@@ -253,14 +158,6 @@ export const MyBookingsPage: React.FC = () => {
                       <Trash2 className="h-4 w-4" /> Delete
                     </button>
                   )}
-                  {remaining > 0 && b.status === "Confirmed" && (
-                    <button
-                      onClick={() => initiateBalancePayment(b)}
-                      className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-primary py-2 px-4 text-sm font-bold text-primary-foreground hover:bg-primary/95 transition-all shadow-sm"
-                    >
-                      <CreditCard className="h-4 w-4" /> Pay TK {remaining.toFixed(2)}
-                    </button>
-                  )}
                 </div>
               </div>
             )
@@ -296,81 +193,6 @@ export const MyBookingsPage: React.FC = () => {
         danger
       />
 
-      {payBooking && (
-        <Modal isOpen={!!payBooking} title="Pay Remaining Balance" onClose={() => setPayBooking(null)}>
-          <form onSubmit={onCompletePayment} className="space-y-5">
-            {stripeIntent?.is_mock && (
-              <div className="rounded-lg bg-amber-50 border border-amber-200/50 p-3.5 text-xs text-amber-800">
-                <p className="font-bold flex items-center gap-1"><Info className="h-4 w-4" /> Demo Mode</p>
-                <p className="mt-1">Demo mode - any card works</p>
-              </div>
-            )}
-            <div className="rounded-lg bg-muted/40 p-4 border text-sm space-y-2">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Remaining Balance:</span>
-                <span className="font-bold text-primary">TK {stripeIntent?.amount?.toFixed(2)}</span>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-muted-foreground">Payment Method</label>
-              <div className="grid grid-cols-4 gap-2">
-                {(["Card", "bKash", "Nagad", "Rocket"] as const).map((m) => (
-                  <div key={m} onClick={() => setPayMethod(m)} className={`cursor-pointer rounded-lg border p-2.5 text-center transition-all ${payMethod === m ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border hover:bg-muted/30"}`}>
-                    <span className="text-xs font-bold">{m === "Card" ? "💳 Card" : `📱 ${m}`}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {payMethod === "Card" ? (
-              <>
-                <div className="relative h-40 rounded-xl bg-gradient-to-br from-emerald-600 via-teal-700 to-emerald-950 p-5 text-white shadow-lg flex flex-col justify-between overflow-hidden">
-                  <div className="absolute right-0 bottom-0 opacity-10 font-bold text-[100px] font-serif">SE</div>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="text-[8px] tracking-widest uppercase opacity-75 font-mono">StayEase Resort</p>
-                      <p className="text-xs font-semibold opacity-90 mt-0.5">Booking Payment</p>
-                    </div>
-                    <span className="font-bold italic text-xs bg-white/10 px-2.5 py-0.5 rounded">Card</span>
-                  </div>
-                  <div className="text-lg tracking-[0.15em] font-mono my-1">•••• •••• •••• {cardLast4 || "••••"}</div>
-                  <div className="flex justify-between items-end text-xs">
-                    <div>
-                      <p className="text-[8px] tracking-wider uppercase opacity-60 font-mono">Card Holder</p>
-                      <p className="font-semibold tracking-wide">{cardName.toUpperCase() || "YOUR NAME"}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[8px] tracking-wider uppercase opacity-60 font-mono">Demo</p>
-                      <p className="font-semibold font-mono">Test Mode</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <input type="text" value={cardName} onChange={e => setCardName(e.target.value)} placeholder="Cardholder Name" className="block w-full rounded-lg border bg-card py-2.5 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" required />
-                  <input type="text" value={cardLast4} onChange={e => setCardLast4(e.target.value.replace(/\D/g, "").substring(0, 4))} placeholder="Last 4 digits" className="block w-full rounded-lg border bg-card py-2.5 px-3 text-sm font-mono text-center focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" required />
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="rounded-lg bg-blue-50 border border-blue-200/50 p-4 text-xs text-blue-800">
-                  <p className="font-bold">Pay via {payMethod}</p>
-                  <p>Send TK {stripeIntent?.amount?.toFixed(2)} to {resortAccounts[payMethod]}</p>
-                </div>
-                <input type="tel" value={senderPhone} onChange={e => setSenderPhone(e.target.value)} placeholder="Your number" className="block w-full rounded-lg border bg-card py-2.5 px-3 text-sm font-mono focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" required />
-                <input type="text" value={transactionId} onChange={e => setTransactionId(e.target.value)} placeholder="Transaction ID" className="block w-full rounded-lg border bg-card py-2.5 px-3 text-sm font-mono focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" required />
-              </>
-            )}
-
-            <div className="flex justify-end gap-3 pt-4 border-t">
-              <button type="button" onClick={() => setPayBooking(null)} disabled={paymentProcessing} className="rounded-lg border px-4 py-2.5 text-sm font-medium hover:bg-secondary transition-colors disabled:opacity-50">Cancel</button>
-              <button type="submit" disabled={paymentProcessing} className="flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50">
-                {paymentProcessing ? <><Loader2 className="h-4 w-4 animate-spin" /> Processing...</> : <><CreditCard className="h-4 w-4" /> Pay Now</>}
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
     </div>
   )
 }

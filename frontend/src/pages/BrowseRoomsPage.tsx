@@ -197,8 +197,15 @@ export const BrowseRoomsPage: React.FC = () => {
       setStripeIntent(intentRes.data)
       setPayingBookingId(booking.id)
     } catch (err: any) {
+      // Auto-cancel pending booking if payment fails
+      if (createdBookingId) {
+        try {
+          await api.patch(`/bookings/${createdBookingId}/status`, { status: "Cancelled" })
+        } catch { /* cleanup failure is non-critical */ }
+      }
       toastError(err.response?.data?.detail || "Failed to create booking.")
       setBookingStep("cart")
+      setCreatedBookingId(null)
     } finally {
       setPaymentProcessing(false)
     }
@@ -249,7 +256,14 @@ export const BrowseRoomsPage: React.FC = () => {
       toastSuccess("Payment successful! Booking confirmed.")
       setBookingStep("done")
     } catch (err: any) {
+      // Auto-cancel pending booking if payment fails
+      if (createdBookingId) {
+        try {
+          await api.patch(`/bookings/${createdBookingId}/status`, { status: "Cancelled" })
+        } catch { /* non-critical */ }
+      }
       toastError(err.response?.data?.detail || "Payment failed.")
+      setBookingStep("cart")
     } finally {
       setPaymentProcessing(false)
     }
@@ -691,7 +705,7 @@ export const BrowseRoomsPage: React.FC = () => {
           </div>
           <div>
             <h3 className="text-lg font-bold">Thank You!</h3>
-            <p className="text-sm text-muted-foreground mt-1">Your booking is confirmed and payment is complete.</p>
+            <p className="text-sm text-muted-foreground mt-1">Your booking is confirmed. Full payment received.</p>
           </div>
           <div className="rounded-xl bg-muted/30 p-4 border text-sm text-left space-y-2">
             {cart.map((item, i) => (

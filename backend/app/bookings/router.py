@@ -192,24 +192,28 @@ async def update_booking_status(
         paid = float(booking.paid_amount)
 
         if paid > 0:
+            cancellation_fee = total * 0.30  # 30% fee kept by resort
+            refund_amount = paid - cancellation_fee  # 70% refunded to guest
+            if refund_amount < 0:
+                refund_amount = 0
+
             payment_repo = PaymentRepository(db)
             payments = await payment_repo.get_by_booking(booking.id)
             for p in payments:
                 if p.status == PaymentStatus.completed:
-                    refund_pct = min(paid, total * 0.3)
-                    refund_share = refund_pct * (float(p.amount) / paid)
+                    p.cancellation_fee = cancellation_fee
                     p.notes = (
-                        f"Cancelled - refunded TK {refund_share:.2f} (30% of total)"
+                        f"Cancelled - Fee: TK {cancellation_fee:.2f} (30%), "
+                        f"Refunded: TK {refund_amount:.2f} (70% of total)"
                     )
                     p.status = PaymentStatus.refunded
                     db.add(p)
-            await db.flush()
 
-        room_repo = RoomRepository(db)
-        for br in booking.booking_rooms:
-            room = await room_repo.get_by_id(br.room_id)
-            if room:
-                await room_repo.update(room, {"status": "Cleaning"})
+            room_repo = RoomRepository(db)
+            for br in booking.booking_rooms:
+                room = await room_repo.get_by_id(br.room_id)
+                if room:
+                    await room_repo.update(room, {"status": "Cleaning"})
         return await repo.update_status(booking, new_status)
 
     room_repo = RoomRepository(db)
