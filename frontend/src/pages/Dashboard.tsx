@@ -169,6 +169,7 @@ export const Dashboard: React.FC = () => {
         </>
       ) : user.role.name === "Accountant" ? (
         <>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground px-3 pt-3 pb-1">Finance</p>
           <button onClick={() => handleTabChange("Payments")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Payments" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
             <CreditCard className="h-4 w-4" />
             <span>Payments</span>
@@ -177,6 +178,7 @@ export const Dashboard: React.FC = () => {
             <FileText className="h-4 w-4" />
             <span>Invoices</span>
           </button>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground px-3 pt-3 pb-1">System</p>
           <button onClick={() => handleTabChange("Settings")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Settings" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
             <Settings className="h-4 w-4" />
             <span>Settings</span>

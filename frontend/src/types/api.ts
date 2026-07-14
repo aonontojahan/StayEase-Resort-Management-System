@@ -119,9 +119,10 @@ export interface Payment {
   id: string
   amount: number
   payment_method: "Cash" | "Card" | "BankTransfer" | "bKash" | "Nagad" | "Rocket"
-  status: "Pending" | "Completed" | "Refunded"
+  status: "Pending" | "Completed" | "Refunded" | "CancelledFee"
   transaction_ref: string | null
   notes: string | null
+  cancellation_fee: number | null
   booking: BookingSimple
   recorded_by: UserSimple | null
   created_at: string

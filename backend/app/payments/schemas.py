@@ -44,6 +44,7 @@ class RevenueSummary(BaseModel):
     total_payments: int
     completed_payments: float
     refunded_payments: float
+    cancellation_fees: float = 0.0
 
 
 class PaymentStatusUpdate(BaseModel):

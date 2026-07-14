@@ -48,6 +48,11 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
     color: "bg-red-100 text-red-800",
     icon: <XCircle className="h-3 w-3" />,
   },
+  CancelledFee: {
+    label: "Cancelled (Fee Retained)",
+    color: "bg-purple-100 text-purple-800",
+    icon: <TrendingDown className="h-3 w-3" />,
+  },
 }
 
 const METHOD_CONFIG: Record<string, string> = {
@@ -59,7 +64,7 @@ const METHOD_CONFIG: Record<string, string> = {
 function exportToCSV(payments: Payment[]) {
   const headers = [
     "Date", "Booking ID", "Amount (TK)", "Method",
-    "Status", "Transaction Ref", "Recorded By", "Notes",
+    "Status", "Cancellation Fee", "Transaction Ref", "Recorded By", "Notes",
   ]
   const rows = payments.map((p) => [
     new Date(p.created_at).toLocaleDateString(),
@@ -67,6 +72,7 @@ function exportToCSV(payments: Payment[]) {
     p.amount.toFixed(2),
     p.payment_method,
     p.status,
+    p.cancellation_fee ? p.cancellation_fee.toFixed(2) : "",
     p.transaction_ref || "",
     p.recorded_by?.full_name || "—",
     p.notes || "",
@@ -282,6 +288,21 @@ export const AccountantPage: React.FC = () => {
 
             <div className="rounded-xl border bg-card p-5 shadow-sm space-y-3">
               <div className="flex items-center justify-between">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Cancellation Fees</p>
+                <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center">
+                  <TrendingDown className="h-4 w-4 text-purple-600" />
+                </div>
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold text-purple-600">
+                  TK {(summary?.cancellation_fees ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </h3>
+                <p className="text-[10px] text-muted-foreground mt-0.5">30% fee retained on cancellations</p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border bg-card p-5 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Filtered View</p>
                 <div className="h-8 w-8 rounded-full bg-amber-100 flex items-center justify-center">
                   <BarChart3 className="h-4 w-4 text-amber-600" />
@@ -375,6 +396,7 @@ export const AccountantPage: React.FC = () => {
                 <option value="Completed">Completed</option>
                 <option value="Pending">Pending</option>
                 <option value="Refunded">Refunded</option>
+                <option value="CancelledFee">Cancelled (Fee)</option>
               </select>
               {/* Date Range */}
               <div className="flex gap-2">
@@ -431,6 +453,7 @@ export const AccountantPage: React.FC = () => {
                       <th className="px-5 py-3">Amount</th>
                       <th className="px-5 py-3">Method</th>
                       <th className="px-5 py-3">Status</th>
+                      <th className="px-5 py-3">Fee</th>
                       <th className="px-5 py-3">Ref #</th>
                       <th className="px-5 py-3">Recorded By</th>
                       <th className="px-5 py-3">Action</th>
@@ -462,6 +485,9 @@ export const AccountantPage: React.FC = () => {
                               {sc?.icon}
                               {p.status}
                             </span>
+                          </td>
+                          <td className="px-5 py-3.5 text-xs text-muted-foreground">
+                            {p.cancellation_fee ? `TK ${p.cancellation_fee.toFixed(2)}` : "—"}
                           </td>
                           <td className="px-5 py-3.5 text-muted-foreground text-xs font-mono">
                             {p.transaction_ref || "—"}

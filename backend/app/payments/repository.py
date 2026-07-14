@@ -109,11 +109,19 @@ class PaymentRepository:
         )
         refunded = float(refund_result.scalar() or 0)
 
+        fee_result = await self.db.execute(
+            select(func.sum(Payment.cancellation_fee)).where(
+                Payment.status == PaymentStatus.refunded
+            )
+        )
+        cancellation_fees = float(fee_result.scalar() or 0)
+
         return RevenueSummary(
-            total_revenue=completed - refunded,
+            total_revenue=completed - refunded + cancellation_fees,
             total_payments=total_count,
             completed_payments=completed,
             refunded_payments=refunded,
+            cancellation_fees=cancellation_fees,
         )
 
     async def refund_payment(self, payment_id: uuid.UUID) -> Optional[Payment]:
