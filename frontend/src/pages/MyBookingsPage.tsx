@@ -7,6 +7,7 @@ import {
   BookOpen, Loader2, RefreshCw, XCircle, CreditCard,
   CheckCircle2, Info, FileText, Calendar, Users, BedDouble, Trash2
 } from "lucide-react"
+import { TableSkeleton } from "@/components/Skeleton"
 
 const STATUS_COLORS: Record<string, string> = {
   Pending: "bg-yellow-100 text-yellow-800 border border-yellow-200",
@@ -26,9 +27,7 @@ export const MyBookingsPage: React.FC = () => {
   // Payment Modal
   const [payBooking, setPayBooking] = useState<Booking | null>(null)
   const [payMethod, setPayMethod] = useState<"Card" | "bKash" | "Nagad" | "Rocket">("Card")
-  const [cardNumber, setCardNumber] = useState("")
-  const [cardExpiry, setCardExpiry] = useState("")
-  const [cardCvc, setCardCvc] = useState("")
+  const [cardLast4, setCardLast4] = useState("")
   const [cardName, setCardName] = useState("")
   const [paymentProcessing, setPaymentProcessing] = useState(false)
   const [stripeIntent, setStripeIntent] = useState<StripeIntent | null>(null)
@@ -83,9 +82,7 @@ export const MyBookingsPage: React.FC = () => {
       setPayBooking(booking)
       setPaymentInvoiceId(null)
       setPayMethod("Card")
-      setCardNumber("")
-      setCardExpiry("")
-      setCardCvc("")
+      setCardLast4("")
       setCardName("")
       setSenderPhone("")
       setTransactionId("")
@@ -105,9 +102,7 @@ export const MyBookingsPage: React.FC = () => {
     if (!payBooking || !stripeIntent) return
 
     if (payMethod === "Card") {
-      if (cardNumber.replace(/\s/g, "").length < 16) { toastError("Valid 16-digit card number required."); return }
-      if (cardExpiry.length < 5) { toastError("Enter expiry in MM/YY."); return }
-      if (cardCvc.length < 3) { toastError("Valid CVC required."); return }
+      if (cardLast4.replace(/\D/g, "").length !== 4) { toastError("Please enter the last 4 digits of your card."); return }
       if (!cardName.trim()) { toastError("Cardholder name required."); return }
     } else {
       if (!senderPhone.trim() || senderPhone.trim().length < 10) { toastError("Valid sender phone required."); return }
@@ -143,28 +138,9 @@ export const MyBookingsPage: React.FC = () => {
     }
   }
 
-  const handleCardNumber = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, "").substring(0, 16)
-    setCardNumber(value.replace(/(\d{4})(?=\d)/g, "$1 "))
-  }
-
-  const handleExpiry = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/\D/g, "").substring(0, 4)
-    if (value.length > 2) value = value.substring(0, 2) + "/" + value.substring(2)
-    setCardExpiry(value)
-  }
-
   const openInvoice = (invId: string) => {
     const token = localStorage.getItem("accessToken")
     window.open(`${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/invoices/${invId}/html?token=${token}`, "_blank")
-  }
-
-  const getCardBrand = () => {
-    const num = cardNumber.replace(/\s/g, "")
-    if (num.startsWith("4")) return "Visa"
-    if (num.startsWith("5")) return "Mastercard"
-    if (num.startsWith("3")) return "Amex"
-    return ""
   }
 
   const resortAccounts: Record<string, string> = {
@@ -200,7 +176,7 @@ export const MyBookingsPage: React.FC = () => {
       )}
 
       {loading ? (
-        <div className="p-12 text-center"><Loader2 className="h-7 w-7 animate-spin mx-auto text-muted-foreground" /></div>
+        <TableSkeleton rows={4} cols={1} />
       ) : bookings.length === 0 ? (
         <div className="rounded-xl border bg-card p-12 text-center text-muted-foreground shadow-sm">
           <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-30" />
@@ -326,7 +302,7 @@ export const MyBookingsPage: React.FC = () => {
             {stripeIntent?.is_mock && (
               <div className="rounded-lg bg-amber-50 border border-amber-200/50 p-3.5 text-xs text-amber-800">
                 <p className="font-bold flex items-center gap-1"><Info className="h-4 w-4" /> Demo Mode</p>
-                <p>Use test card 4242 4242 4242 4242.</p>
+                <p className="mt-1">Demo mode - any card works</p>
               </div>
             )}
             <div className="rounded-lg bg-muted/40 p-4 border text-sm space-y-2">
@@ -351,23 +327,28 @@ export const MyBookingsPage: React.FC = () => {
               <>
                 <div className="relative h-40 rounded-xl bg-gradient-to-br from-emerald-600 via-teal-700 to-emerald-950 p-5 text-white shadow-lg flex flex-col justify-between overflow-hidden">
                   <div className="absolute right-0 bottom-0 opacity-10 font-bold text-[100px] font-serif">SE</div>
-                  <div className="text-lg tracking-[0.15em] font-mono my-1">{cardNumber || "•••• •••• •••• ••••"}</div>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-[8px] tracking-widest uppercase opacity-75 font-mono">StayEase Resort</p>
+                      <p className="text-xs font-semibold opacity-90 mt-0.5">Booking Payment</p>
+                    </div>
+                    <span className="font-bold italic text-xs bg-white/10 px-2.5 py-0.5 rounded">Card</span>
+                  </div>
+                  <div className="text-lg tracking-[0.15em] font-mono my-1">•••• •••• •••• {cardLast4 || "••••"}</div>
                   <div className="flex justify-between items-end text-xs">
                     <div>
-                      <p className="text-[8px] tracking-wider uppercase opacity-60">Card Holder</p>
-                      <p className="font-semibold">{cardName.toUpperCase() || "YOUR NAME"}</p>
+                      <p className="text-[8px] tracking-wider uppercase opacity-60 font-mono">Card Holder</p>
+                      <p className="font-semibold tracking-wide">{cardName.toUpperCase() || "YOUR NAME"}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-[8px] tracking-wider uppercase opacity-60">Expires</p>
-                      <p className="font-semibold font-mono">{cardExpiry || "MM/YY"}</p>
+                      <p className="text-[8px] tracking-wider uppercase opacity-60 font-mono">Demo</p>
+                      <p className="font-semibold font-mono">Test Mode</p>
                     </div>
                   </div>
                 </div>
-                <input type="text" value={cardName} onChange={e => setCardName(e.target.value)} placeholder="Cardholder Name" className="block w-full rounded-lg border bg-card py-2.5 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" required />
-                <input type="text" value={cardNumber} onChange={handleCardNumber} placeholder="4242 4242 4242 4242" className="block w-full rounded-lg border bg-card py-2.5 px-3 text-sm font-mono focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" required />
-                <div className="grid grid-cols-2 gap-4">
-                  <input type="text" value={cardExpiry} onChange={handleExpiry} placeholder="MM/YY" className="block w-full rounded-lg border bg-card py-2.5 px-3 text-sm font-mono text-center focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" required />
-                  <input type="password" value={cardCvc} onChange={e => setCardCvc(e.target.value.replace(/\D/g, "").substring(0, 4))} placeholder="CVC" className="block w-full rounded-lg border bg-card py-2.5 px-3 text-sm font-mono text-center focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" required />
+                <div className="space-y-3">
+                  <input type="text" value={cardName} onChange={e => setCardName(e.target.value)} placeholder="Cardholder Name" className="block w-full rounded-lg border bg-card py-2.5 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" required />
+                  <input type="text" value={cardLast4} onChange={e => setCardLast4(e.target.value.replace(/\D/g, "").substring(0, 4))} placeholder="Last 4 digits" className="block w-full rounded-lg border bg-card py-2.5 px-3 text-sm font-mono text-center focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" required />
                 </div>
               </>
             ) : (
