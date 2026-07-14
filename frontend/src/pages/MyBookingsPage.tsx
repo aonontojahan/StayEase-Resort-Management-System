@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from "react"
 import { api } from "@/services/api"
-import { Booking, Refund } from "@/types/api"
+import { Booking } from "@/types/api"
 import { useToast } from "@/components/Toast"
-import { ConfirmModal, Modal } from "@/components/Modal"
+import { ConfirmModal } from "@/components/Modal"
 import {
-  BookOpen, Loader2, RefreshCw, XCircle, RotateCcw,
-  Calendar, Users, BedDouble, Trash2
+  BookOpen, RefreshCw, XCircle, RotateCcw,
+  Calendar, Users, Trash2
 } from "lucide-react"
 import { TableSkeleton } from "@/components/Skeleton"
 

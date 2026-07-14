@@ -3,8 +3,7 @@ import { useAuth } from "@/store/AuthContext"
 import { api } from "@/services/api"
 import { OccupancyReport, BookingsSummary, RevenueReport } from "@/types/api"
 import { 
-  Loader2, 
-  Home, BookOpen, BedDouble, Users, Sparkles, CreditCard, FileText, Menu, X, Settings,
+  Home, BookOpen, BedDouble, Sparkles, CreditCard, FileText, Menu, X, Settings,
   UserCheck, UserCircle, LogIn, LogOut, Sun, Moon
 } from "lucide-react"
 
@@ -302,7 +301,7 @@ export const Dashboard: React.FC = () => {
                       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                         <LogOut className="h-3 w-3" /> Due Check-outs
                       </p>
-                      <h3 className="text-2xl font-bold mt-1 text-amber-600">{bookingsSummary?.Pending || 0}</h3>
+                      <h3 className="text-2xl font-bold mt-1 text-amber-600">{bookingsSummary?.CheckedIn || 0}</h3>
                     </div>
                     <p className="text-[10px] text-muted-foreground">Expected to depart today</p>
                   </div>
