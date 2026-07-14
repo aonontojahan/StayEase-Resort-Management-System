@@ -92,12 +92,10 @@ class HousekeepingRepository:
         task.status = new_status
         if new_status == TaskStatus.done:
             task.completed_at = datetime.now(timezone.utc)
-            from app.rooms.repository import RoomRepository
+            from app.rooms.models import RoomStatus
 
-            room_repo = RoomRepository(self.db)
-            room = await room_repo.get_by_id(task.room_id)
-            if room:
-                await room_repo.update(room, {"status": "Available"})
+            task.room.status = RoomStatus.cleaned
+            self.db.add(task.room)
         else:
             task.completed_at = None
         self.db.add(task)

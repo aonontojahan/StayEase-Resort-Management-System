@@ -10,7 +10,7 @@ import { useToast } from "@/components/Toast"
 import { Modal, ConfirmModal } from "@/components/Modal"
 import {
   BedDouble, Plus, Pencil, Trash2, Loader2, RefreshCw,
-  Search, Filter, Tag, ChevronDown,
+  Search, Filter, Tag, ChevronDown, Sparkles,
 } from "lucide-react"
 
 const roomCreateSchema = z.object({
@@ -41,6 +41,7 @@ const STATUS_COLORS: Record<string, string> = {
   Occupied: "bg-blue-100 text-blue-800",
   Cleaning: "bg-yellow-100 text-yellow-800",
   Maintenance: "bg-red-100 text-red-800",
+  Cleaned: "bg-purple-100 text-purple-800",
 }
 
 export const RoomsPage: React.FC = () => {
@@ -155,6 +156,16 @@ export const RoomsPage: React.FC = () => {
     }
   }
 
+  const markAvailable = async (room: Room) => {
+    try {
+      await api.patch(`/rooms/${room.id}/mark-available`)
+      toastSuccess(`Room ${room.room_number} marked as Available.`)
+      fetchData()
+    } catch (err: any) {
+      toastError(err.response?.data?.detail || "Failed to update room.")
+    }
+  }
+
   // Create Room Type
   const onCreateType = async (data: any) => {
     try {
@@ -204,7 +215,7 @@ export const RoomsPage: React.FC = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {["Available", "Occupied", "Cleaning", "Maintenance"].map((s) => (
+        {["Available", "Occupied", "Cleaning", "Maintenance", "Cleaned"].map((s) => (
           <div key={s} className="rounded-xl border bg-card p-4 shadow-sm">
             <p className="text-xs text-muted-foreground font-medium">{s}</p>
             <p className="text-2xl font-bold mt-1">
@@ -236,6 +247,7 @@ export const RoomsPage: React.FC = () => {
             <option>Available</option>
             <option>Occupied</option>
             <option>Cleaning</option>
+            <option>Cleaned</option>
             <option>Maintenance</option>
           </select>
           <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -285,6 +297,15 @@ export const RoomsPage: React.FC = () => {
                     </td>
                     <td className="px-5 py-3.5">
                       <div className="flex gap-2">
+                        {room.status === "Cleaned" && (
+                          <button
+                            onClick={() => markAvailable(room)}
+                            className="flex items-center gap-1 rounded-lg border border-purple-200 bg-purple-50 px-2 py-1 text-[10px] font-semibold text-purple-700 hover:bg-purple-100 transition-colors"
+                            title="Mark room as available"
+                          >
+                            <Sparkles className="h-3 w-3" /> Mark Available
+                          </button>
+                        )}
                         <button
                           onClick={() => openEdit(room)}
                           className="rounded-lg border p-1.5 text-muted-foreground hover:text-primary hover:border-primary/50 transition-colors"
@@ -376,6 +397,7 @@ export const RoomsPage: React.FC = () => {
                 <option>Available</option>
                 <option>Occupied</option>
                 <option>Cleaning</option>
+                <option>Cleaned</option>
                 <option>Maintenance</option>
               </select>
             </div>

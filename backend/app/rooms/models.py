@@ -25,6 +25,7 @@ class RoomStatus(str, enum.Enum):
     occupied = "Occupied"
     maintenance = "Maintenance"
     cleaning = "Cleaning"
+    cleaned = "Cleaned"
 
 
 class RoomType(Base):

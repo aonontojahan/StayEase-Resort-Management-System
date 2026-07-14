@@ -127,7 +127,11 @@ export const HousekeepingPage: React.FC = () => {
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <Sparkles className="h-6 w-6 text-primary" /> Housekeeping
           </h2>
-          <p className="text-sm text-muted-foreground mt-0.5">{tasks.length} total tasks</p>
+          <p className="text-sm text-muted-foreground mt-0.5">{tasks.length} total tasks{tasks.filter(t => t.status === "Pending").length > 0 && (
+            <span className="ml-2 inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-semibold text-yellow-800">
+              {tasks.filter(t => t.status === "Pending").length} pending
+            </span>
+          )}</p>
         </div>
         <div className="flex gap-2">
           <button onClick={fetchData} className="rounded-lg border p-2 hover:bg-secondary transition-colors" title="Refresh">
@@ -184,7 +188,7 @@ export const HousekeepingPage: React.FC = () => {
               <div className="flex items-start justify-between gap-2">
                 <div className="space-y-1 flex-1 min-w-0">
                   <p className="font-semibold truncate">{task.title}</p>
-                  <p className="text-xs text-muted-foreground">Room {task.room.room_number} · Floor {task.room.floor}</p>
+                  <p className="text-xs text-muted-foreground">Room {task.room.room_number} · {task.room.room_type.name} · Floor {task.room.floor}</p>
                 </div>
                 <button
                   onClick={() => setDeleteTask(task)}
@@ -214,24 +218,37 @@ export const HousekeepingPage: React.FC = () => {
               )}
 
               {task.due_date && (
-                <p className="text-xs text-muted-foreground">Due: {task.due_date}</p>
+                <p className={`text-xs ${new Date(task.due_date) < new Date() && task.status !== "Done" ? "text-red-600 font-semibold" : "text-muted-foreground"}`}>
+                  {new Date(task.due_date) < new Date() && task.status !== "Done" ? "🔴 Overdue: " : "Due: "}
+                  {task.due_date}
+                </p>
               )}
 
               {updatingId === task.id ? (
                 <div className="flex justify-center"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
               ) : (
-                <div className="relative">
-                  <select
-                    defaultValue=""
-                    onChange={(e) => { if (e.target.value) updateStatus(task, e.target.value) }}
-                    className="w-full rounded-lg border bg-secondary py-1.5 pl-3 pr-8 text-xs font-medium focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20 appearance-none cursor-pointer"
-                  >
-                    <option value="" disabled>Change status...</option>
-                    {["Pending", "InProgress", "Done"].filter((s) => s !== task.status).map((s) => (
-                      <option key={s} value={s}>{s === "InProgress" ? "In Progress" : s}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                <div className="flex gap-2">
+                  {task.status === "InProgress" && (
+                    <button
+                      onClick={() => updateStatus(task, "Done")}
+                      className="flex items-center gap-1 rounded-lg bg-green-100 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-200 transition-colors"
+                    >
+                      <Sparkles className="h-3 w-3" /> Mark Done
+                    </button>
+                  )}
+                  <div className="relative flex-1">
+                    <select
+                      defaultValue=""
+                      onChange={(e) => { if (e.target.value) updateStatus(task, e.target.value) }}
+                      className="w-full rounded-lg border bg-secondary py-1.5 pl-3 pr-8 text-xs font-medium focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20 appearance-none cursor-pointer"
+                    >
+                      <option value="" disabled>Change status...</option>
+                      {["Pending", "InProgress", "Done"].filter((s) => s !== task.status).map((s) => (
+                        <option key={s} value={s}>{s === "InProgress" ? "In Progress" : s}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                  </div>
                 </div>
               )}
             </div>

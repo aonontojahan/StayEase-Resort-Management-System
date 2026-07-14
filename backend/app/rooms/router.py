@@ -184,3 +184,22 @@ async def delete_room(
     if not room:
         raise NotFoundException("Room not found.")
     await repo.delete(room)
+
+
+@router.patch("/rooms/{room_id}/mark-available", response_model=RoomRead)
+async def mark_room_available(
+    room_id: uuid.UUID,
+    _: User = require_role(["Resort Owner", "Manager"]),
+    db: AsyncSession = Depends(get_db),
+):
+    repo = RoomRepository(db)
+    room = await repo.get_by_id(room_id)
+    if not room:
+        raise NotFoundException("Room not found.")
+    if room.status.value not in ("Cleaned", "Cleaning"):
+        raise BadRequestException(
+            "Room must be in 'Cleaned' or 'Cleaning' status to mark available."
+        )
+    from app.rooms.models import RoomStatus
+
+    return await repo.update(room, {"status": RoomStatus.available})
