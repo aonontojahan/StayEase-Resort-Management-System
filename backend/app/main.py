@@ -13,6 +13,7 @@ from app.rooms.router import router as rooms_router
 from app.bookings.router import router as bookings_router
 from app.housekeeping.router import router as housekeeping_router
 from app.payments.router import router as payments_router
+from app.refunds.router import router as refunds_router
 from app.reports.router import router as reports_router
 from app.invoices.router import router as invoices_router
 from app.uploads.router import router as uploads_router
@@ -36,6 +37,7 @@ import app.rooms.models  # noqa
 import app.bookings.models  # noqa  # also imports BookingRoom
 import app.housekeeping.models  # noqa
 import app.payments.models  # noqa
+import app.refunds.models  # noqa
 import app.invoices.models  # noqa
 import app.audit.models  # noqa
 
@@ -153,6 +155,7 @@ app.include_router(rooms_router, prefix=settings.API_V1_STR)
 app.include_router(bookings_router, prefix=settings.API_V1_STR)
 app.include_router(housekeeping_router, prefix=settings.API_V1_STR)
 app.include_router(payments_router, prefix=settings.API_V1_STR)
+app.include_router(refunds_router, prefix=settings.API_V1_STR)
 app.include_router(reports_router, prefix=settings.API_V1_STR)
 app.include_router(invoices_router, prefix=settings.API_V1_STR)
 app.include_router(uploads_router, prefix=settings.API_V1_STR)

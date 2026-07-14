@@ -410,3 +410,67 @@ async def pay_via_mobile_banking(
         "payment": PaymentRead.model_validate(payment).model_dump(),
         "invoice_id": str(invoice.id),
     }
+
+
+@router.post("/stripe/webhook")
+async def stripe_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature")
+
+    if settings.STRIPE_WEBHOOK_SECRET and sig_header:
+        try:
+            stripe.api_key = settings.STRIPE_SECRET_KEY
+            event = stripe.Webhook.construct_event(
+                payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+            )
+        except Exception as e:
+            logger.error(f"Stripe webhook signature verification failed: {e}")
+            return JSONResponse(status_code=400, content={"error": "Invalid signature"})
+    else:
+        import json
+
+        event = json.loads(payload)
+
+    event_type = event.get("type") if isinstance(event, dict) else event.type
+
+    if event_type == "payment_intent.succeeded":
+        intent = (
+            event["data"]["object"] if isinstance(event, dict) else event.data.object
+        )
+        booking_id = (
+            intent.get("metadata", {}).get("booking_id")
+            if isinstance(intent, dict)
+            else intent.metadata.get("booking_id")
+        )
+        if booking_id:
+            try:
+                booking_uuid = uuid.UUID(booking_id)
+                from app.bookings.repository import BookingRepository
+                from app.bookings.models import BookingStatus
+
+                booking_repo = BookingRepository(db)
+                booking = await booking_repo.get_by_id(booking_uuid)
+                if booking and booking.status == BookingStatus.pending:
+                    await booking_repo.update_status(booking, BookingStatus.confirmed)
+                    logger.info(
+                        f"Booking {booking_id} auto-confirmed via Stripe webhook"
+                    )
+            except Exception as e:
+                logger.error(f"Webhook booking confirmation failed: {e}")
+
+    elif event_type == "payment_intent.refunded":
+        intent = (
+            event["data"]["object"] if isinstance(event, dict) else event.data.object
+        )
+        booking_id = (
+            intent.get("metadata", {}).get("booking_id")
+            if isinstance(intent, dict)
+            else intent.metadata.get("booking_id")
+        )
+        if booking_id:
+            logger.info(f"Stripe refund webhook received for booking {booking_id}")
+
+    return {"status": "ok"}

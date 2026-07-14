@@ -241,3 +241,24 @@ export interface InvoiceSummary {
   paid_count: number
   unpaid_count: number
 }
+
+// ── Refunds ──────────────────────────────────────────────────────────────
+export interface Refund {
+  id: string
+  payment_id: string
+  booking_id: string
+  amount: number
+  cancellation_fee: number | null
+  refund_method: string | null
+  status: "Pending" | "Completed" | "Failed"
+  transaction_ref: string | null
+  notes: string | null
+  created_at: string
+  completed_at: string | null
+}
+
+export interface RefundSummary {
+  pending_count: number
+  total_refunded: number
+  total_cancellation_fees: number
+}

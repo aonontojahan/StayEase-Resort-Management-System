@@ -124,19 +124,26 @@ class PaymentRepository:
             cancellation_fees=cancellation_fees,
         )
 
-    async def refund_payment(self, payment_id: uuid.UUID) -> Optional[Payment]:
+    async def mark_refunded(
+        self, payment_id: uuid.UUID, cancellation_fee: float = 0
+    ) -> Optional[Payment]:
         payment = await self.get_by_id(payment_id)
         if not payment:
             return None
         payment.status = PaymentStatus.refunded
+        payment.cancellation_fee = cancellation_fee
+        self.db.add(payment)
+        await self.db.flush()
+        return await self.get_by_id(payment_id)
+
+    async def refund_payment(self, payment_id: uuid.UUID) -> Optional[Payment]:
+        payment = await self.get_by_id(payment_id)
+        if not payment:
+            return None
         total = (
             float(payment.booking.total_amount)
             if payment.booking
             else float(payment.amount)
         )
         cancellation_fee = total * 0.30
-        payment.cancellation_fee = cancellation_fee
-        payment.notes = f"Refunded (30% fee: TK {cancellation_fee:.2f})"
-        self.db.add(payment)
-        await self.db.flush()
-        return await self.get_by_id(payment_id)
+        return await self.mark_refunded(payment_id, cancellation_fee)

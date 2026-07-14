@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react"
 import { api } from "@/services/api"
-import { Payment, RevenueReport } from "@/types/api"
+import { Payment, RevenueReport, Refund, RefundSummary } from "@/types/api"
 import { useToast } from "@/components/Toast"
 import { Modal } from "@/components/Modal"
 import { useForm } from "react-hook-form"
@@ -98,6 +98,9 @@ export const AccountantPage: React.FC = () => {
   const [summary, setSummary]           = useState<RevenueSummary | null>(null)
   const [revenue, setRevenue]           = useState<RevenueReport[]>([])
   const [loading, setLoading]           = useState(true)
+  const [refunds, setRefunds]           = useState<Refund[]>([])
+  const [refundSummary, setRefundSummary] = useState<RefundSummary | null>(null)
+  const [showRefundHistory, setShowRefundHistory] = useState(false)
 
   const [search, setSearch]             = useState("")
   const [filterMethod, setFilterMethod] = useState("")
@@ -107,6 +110,8 @@ export const AccountantPage: React.FC = () => {
   const [createOpen, setCreateOpen]     = useState(false)
   const [refundTarget, setRefundTarget] = useState<Payment | null>(null)
   const [refunding, setRefunding]       = useState(false)
+  const [refundMethod, setRefundMethod] = useState("Stripe")
+  const [refundRef, setRefundRef]       = useState("")
 
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
@@ -117,16 +122,20 @@ export const AccountantPage: React.FC = () => {
   const fetchData = async () => {
     setLoading(true)
     try {
-      const [paymentsRes, bookingsRes, summaryRes, revRes] = await Promise.all([
+      const [paymentsRes, bookingsRes, summaryRes, revRes, refundRes, refundSumRes] = await Promise.all([
         api.get<Payment[]>("/payments/"),
         api.get<any[]>("/bookings/"),
         api.get<RevenueSummary>("/payments/summary"),
         api.get<RevenueReport[]>("/reports/revenue"),
+        api.get<Refund[]>("/refunds/"),
+        api.get<RefundSummary>("/refunds/summary"),
       ])
       setPayments(paymentsRes.data)
       setBookings(bookingsRes.data)
       setSummary(summaryRes.data)
       setRevenue(revRes.data)
+      setRefunds(refundRes.data)
+      setRefundSummary(refundSumRes.data)
     } catch {
       toastError("Failed to load financial data.")
     } finally {
@@ -172,14 +181,25 @@ export const AccountantPage: React.FC = () => {
     if (!refundTarget) return
     setRefunding(true)
     try {
-      await api.patch(`/payments/${refundTarget.id}/refund`)
-      toastSuccess(`TK ${refundTarget.amount.toFixed(2)} marked as refunded.`)
+      const total = refundTarget.booking.total_amount
+      const cancellationFee = total * 0.30
+      const refundAmount = refundTarget.amount - cancellationFee
+
+      await api.post("/refunds/", {
+        payment_id: refundTarget.id,
+        amount: Math.max(0, refundAmount),
+        refund_method: refundMethod,
+        cancellation_fee: cancellationFee,
+        notes: refundRef ? `Ref: ${refundRef}` : undefined,
+      })
+      toastSuccess(`Refund of TK ${Math.max(0, refundAmount).toFixed(2)} initiated via ${refundMethod}.`)
       setRefundTarget(null)
       fetchData()
     } catch (err: any) {
       toastError(err.response?.data?.detail || "Failed to process refund.")
     } finally {
       setRefunding(false)
+      setRefundRef("")
     }
   }
 
@@ -215,6 +235,18 @@ export const AccountantPage: React.FC = () => {
             title="Refresh"
           >
             <RefreshCw className="h-4 w-4 text-muted-foreground" />
+          </button>
+          <button
+            onClick={() => setShowRefundHistory(true)}
+            className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-secondary transition-colors"
+          >
+            <RotateCcw className="h-4 w-4 text-muted-foreground" />
+            Refunds
+            {refundSummary && refundSummary.pending_count > 0 && (
+              <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-destructive text-[10px] font-bold text-white">
+                {refundSummary.pending_count}
+              </span>
+            )}
           </button>
           <button
             onClick={() => exportToCSV(filtered)}
@@ -601,7 +633,7 @@ export const AccountantPage: React.FC = () => {
       </Modal>
 
       {/* Refund Confirmation Modal */}
-      <Modal isOpen={!!refundTarget} title="Confirm Refund" onClose={() => setRefundTarget(null)}>
+      <Modal isOpen={!!refundTarget} title="Process Refund" onClose={() => { setRefundTarget(null); setRefundRef("") }}>
         {refundTarget && (
           <div className="space-y-5">
             <div className="rounded-xl bg-red-50 border border-red-200 p-4 space-y-2">
@@ -610,13 +642,21 @@ export const AccountantPage: React.FC = () => {
                 This action cannot be undone
               </div>
               <p className="text-sm text-red-600">
-                You are about to mark this payment as <strong>Refunded</strong>. The transaction status will be permanently updated.
+                A 30% cancellation fee will be retained by the resort. The remaining 70% will be refunded to the guest.
               </p>
             </div>
             <div className="space-y-2.5 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Payment Amount</span>
+                <span className="text-muted-foreground">Original Payment</span>
                 <span className="font-bold">TK {refundTarget.amount.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Cancellation Fee (30%)</span>
+                <span className="font-bold text-destructive">- TK {(refundTarget.booking.total_amount * 0.30).toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between border-t pt-2 mt-2">
+                <span className="font-semibold">Refund Amount</span>
+                <span className="font-bold text-emerald-600">TK {Math.max(0, refundTarget.amount - refundTarget.booking.total_amount * 0.30).toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Method</span>
@@ -626,16 +666,37 @@ export const AccountantPage: React.FC = () => {
                 <span className="text-muted-foreground">Booking</span>
                 <span className="font-mono text-xs">{refundTarget.booking.id.slice(0, 16)}…</span>
               </div>
-              {refundTarget.transaction_ref && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Ref #</span>
-                  <span className="font-mono text-xs">{refundTarget.transaction_ref}</span>
-                </div>
-              )}
             </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-muted-foreground">Refund Method</label>
+              <select
+                value={refundMethod}
+                onChange={(e) => setRefundMethod(e.target.value)}
+                className="block w-full rounded-lg border bg-card py-2.5 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="Stripe">Stripe (Card - Automatic)</option>
+                <option value="Cash">Cash (Immediate)</option>
+                <option value="bKash">bKash (Manual)</option>
+                <option value="Nagad">Nagad (Manual)</option>
+                <option value="Rocket">Rocket (Manual)</option>
+                <option value="BankTransfer">Bank Transfer (Manual)</option>
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-muted-foreground">Reference (Optional)</label>
+              <input
+                value={refundRef}
+                onChange={(e) => setRefundRef(e.target.value)}
+                placeholder="e.g. refund TXN ID or notes"
+                className="block w-full rounded-lg border bg-card py-2.5 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+            </div>
+
             <div className="flex justify-end gap-3 pt-1">
               <button
-                onClick={() => setRefundTarget(null)}
+                onClick={() => { setRefundTarget(null); setRefundRef("") }}
                 className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-secondary transition-colors"
               >
                 Cancel
@@ -647,11 +708,69 @@ export const AccountantPage: React.FC = () => {
               >
                 {refunding && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                 <RotateCcw className="h-3.5 w-3.5" />
-                Confirm Refund
+                {refundMethod === "Stripe" || refundMethod === "Cash" ? "Process Refund Now" : "Initiate Refund"}
               </button>
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Refund History Modal */}
+      <Modal isOpen={showRefundHistory} title="Refund History" onClose={() => setShowRefundHistory(false)} size="lg">
+        <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+          {refundSummary && (
+            <div className="grid grid-cols-3 gap-3 pb-3 border-b">
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground">Total Refunded</p>
+                <p className="font-bold text-emerald-600">TK {refundSummary.total_refunded.toFixed(2)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground">Fees Retained</p>
+                <p className="font-bold text-purple-600">TK {refundSummary.total_cancellation_fees.toFixed(2)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground">Pending</p>
+                <p className="font-bold text-amber-600">{refundSummary.pending_count}</p>
+              </div>
+            </div>
+          )}
+          {refunds.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">No refunds processed yet.</p>
+          ) : (
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs text-muted-foreground uppercase bg-muted/30">
+                <tr>
+                  <th className="px-3 py-2">Date</th>
+                  <th className="px-3 py-2">Amount</th>
+                  <th className="px-3 py-2">Fee</th>
+                  <th className="px-3 py-2">Method</th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">Ref #</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {refunds.map((r) => (
+                  <tr key={r.id} className="hover:bg-muted/20">
+                    <td className="px-3 py-2 text-xs">{new Date(r.created_at).toLocaleDateString()}</td>
+                    <td className="px-3 py-2 font-semibold text-emerald-600">TK {r.amount.toFixed(2)}</td>
+                    <td className="px-3 py-2 text-xs">{r.cancellation_fee ? `TK ${r.cancellation_fee.toFixed(2)}` : "—"}</td>
+                    <td className="px-3 py-2 text-xs">{r.refund_method || "—"}</td>
+                    <td className="px-3 py-2">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                        r.status === "Completed" ? "bg-green-100 text-green-800" :
+                        r.status === "Pending" ? "bg-amber-100 text-amber-800" :
+                        "bg-red-100 text-red-800"
+                      }`}>
+                        {r.status}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-xs font-mono">{r.transaction_ref || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </Modal>
     </div>
   )

@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from "react"
 import { api } from "@/services/api"
-import { Booking } from "@/types/api"
+import { Booking, Refund } from "@/types/api"
 import { useToast } from "@/components/Toast"
 import { ConfirmModal, Modal } from "@/components/Modal"
 import {
-  BookOpen, Loader2, RefreshCw, XCircle,
+  BookOpen, Loader2, RefreshCw, XCircle, RotateCcw,
   Calendar, Users, BedDouble, Trash2
 } from "lucide-react"
 import { TableSkeleton } from "@/components/Skeleton"
@@ -107,6 +107,14 @@ export const MyBookingsPage: React.FC = () => {
                       {b.status}
                     </span>
                   </div>
+                  {b.status === "Cancelled" && (
+                    <div className="p-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
+                      <div className="flex items-center gap-1.5 font-semibold">
+                        <RotateCcw className="h-3 w-3" />
+                        Refund: TK {(b.total_amount * 0.70).toFixed(2)} (70%) — 30% fee retained
+                      </div>
+                    </div>
+                  )}
 
                   {/* Room Details */}
                   <div className="space-y-2">
