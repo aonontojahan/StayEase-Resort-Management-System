@@ -41,6 +41,7 @@ class PaymentRead(BaseModel):
 
 class RevenueSummary(BaseModel):
     total_revenue: float
+    net_revenue: float = 0.0
     total_payments: int
     completed_payments: float
     refunded_payments: float
@@ -65,4 +66,4 @@ class MobileBankingPayment(BaseModel):
     amount: float = Field(..., gt=0)
     payment_method: str
     transaction_ref: str
-    sender_phone: str
+    sender_phone: str = Field(..., pattern=r"^\+?[0-9]{10,15}$")

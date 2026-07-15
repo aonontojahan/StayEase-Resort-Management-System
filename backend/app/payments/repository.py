@@ -4,6 +4,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.payments.models import Payment, PaymentMethod, PaymentStatus
 from app.payments.schemas import PaymentCreate, RevenueSummary
 from app.bookings.models import Booking
@@ -116,8 +117,10 @@ class PaymentRepository:
         )
         cancellation_fees = float(fee_result.scalar() or 0)
 
+        net_revenue = completed - refunded + cancellation_fees
         return RevenueSummary(
             total_revenue=completed + cancellation_fees,
+            net_revenue=net_revenue,
             total_payments=total_count,
             completed_payments=completed,
             refunded_payments=refunded,
@@ -140,10 +143,9 @@ class PaymentRepository:
         payment = await self.get_by_id(payment_id)
         if not payment:
             return None
-        total = (
-            float(payment.booking.total_amount)
-            if payment.booking
-            else float(payment.amount)
+        total_paid = float(payment.amount)
+        cancellation_fee = min(
+            total_paid * settings.CANCELLATION_FEE_PERCENTAGE,
+            total_paid,
         )
-        cancellation_fee = total * 0.30
         return await self.mark_refunded(payment_id, cancellation_fee)

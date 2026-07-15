@@ -23,7 +23,7 @@ class PaymentStatus(str, enum.Enum):
     pending = "Pending"
     completed = "Completed"
     refunded = "Refunded"
-    cancelled_fee = "CancelledFee"  # 30% fee retained by resort on cancellation
+    cancelled_fee = "CancelledFee"
 
 
 class Payment(Base):

@@ -110,6 +110,11 @@ async def record_payment(
     repo = PaymentRepository(db)
     payment = await repo.create(data, current_user.id)
 
+    if booking.status == BookingStatus.pending:
+        await booking_repo.update_status(booking, BookingStatus.confirmed)
+
+    await db.refresh(booking, ["payments"])
+
     desc = f"Full Payment - {booking.id}"
     inv_data = InvoiceCreate(
         booking_id=booking.id,
@@ -244,6 +249,10 @@ async def confirm_stripe_payment(
                     f"Stripe payment was not successful: status is {intent.status}"
                 )
             stripe_amount = intent.amount / 100.0
+            if stripe_amount > remaining_balance:
+                raise BadRequestException(
+                    f"Stripe amount ({stripe_amount}) exceeds remaining balance ({remaining_balance})"
+                )
             if abs(stripe_amount - amount) > 0.1:
                 amount = stripe_amount
         except Exception as e:
@@ -261,12 +270,12 @@ async def confirm_stripe_payment(
     if booking.status == BookingStatus.pending:
         await booking_repo.update_status(booking, BookingStatus.confirmed)
 
+    await db.refresh(booking, ["payments"])
+
     booking_total = float(booking.total_amount)
-    nights = 1
     room_info = ""
     for br in booking.booking_rooms:
         br_nights = (br.check_out_date - br.check_in_date).days
-        nights = max(nights, br_nights)
         room_info += f"{br.room.room_type.name} x {br_nights} nights, "
 
     desc = f"Full Payment - {room_info}"
@@ -302,7 +311,14 @@ async def confirm_stripe_payment(
         check_out=str(booking.booking_rooms[0].check_out_date)
         if booking.booking_rooms
         else "",
-        nights=nights,
+        nights=(
+            (
+                booking.booking_rooms[0].check_out_date
+                - booking.booking_rooms[0].check_in_date
+            ).days
+            if booking.booking_rooms
+            else 0
+        ),
         total_amount=booking_total,
         amount_paid=new_paid,
         remaining_balance=new_remaining,
@@ -358,6 +374,8 @@ async def pay_via_mobile_banking(
 
     if booking.status == BookingStatus.pending:
         await booking_repo.update_status(booking, BookingStatus.confirmed)
+
+    await db.refresh(booking, ["payments"])
 
     booking_total = float(booking.total_amount)
 
@@ -457,13 +475,41 @@ async def stripe_webhook(
                 booking_uuid = uuid.UUID(booking_id)
                 from app.bookings.repository import BookingRepository
                 from app.bookings.models import BookingStatus
+                from app.payments.repository import PaymentRepository
+                from app.payments.schemas import PaymentCreate
 
                 booking_repo = BookingRepository(db)
                 booking = await booking_repo.get_by_id(booking_uuid)
-                if booking and booking.status == BookingStatus.pending:
+                if not booking:
+                    logger.warning(f"Webhook: booking {booking_id} not found")
+                    return {"status": "ok"}
+
+                intent_id = intent.get("id") if isinstance(intent, dict) else intent.id
+                amount = (
+                    intent.get("amount", 0) / 100.0
+                    if isinstance(intent, dict)
+                    else intent.amount / 100.0
+                )
+
+                payment_repo = PaymentRepository(db)
+                existing = await payment_repo.get_by_booking(booking_uuid)
+                if any(p.transaction_ref == intent_id for p in existing):
+                    logger.info(f"Webhook: payment {intent_id} already recorded")
+                    return {"status": "ok"}
+
+                payment_data = PaymentCreate(
+                    booking_id=booking_uuid,
+                    amount=amount,
+                    payment_method="Card",
+                    transaction_ref=intent_id,
+                    notes="Stripe payment via webhook.",
+                )
+                await payment_repo.create(payment_data, booking_uuid)
+
+                if booking.status == BookingStatus.pending:
                     await booking_repo.update_status(booking, BookingStatus.confirmed)
                     logger.info(
-                        f"Booking {booking_id} auto-confirmed via Stripe webhook"
+                        f"Booking {booking_id} auto-confirmed and payment recorded via Stripe webhook"
                     )
             except Exception as e:
                 logger.error(f"Webhook booking confirmation failed: {e}")

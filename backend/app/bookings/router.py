@@ -25,11 +25,14 @@ from app.core.exceptions import (
     NotFoundException,
 )
 from app.core.config import settings
+from app.core.email import send_html_email, get_refund_notification_html
 from app.core.pagination import PaginationParams
 from app.invoices.repository import InvoiceRepository
 from app.invoices.schemas import InvoiceCreate, InvoiceItemCreate
 from app.payments.models import PaymentStatus
 from app.payments.repository import PaymentRepository
+from app.refunds.models import RefundStatus
+from app.refunds.repository import RefundRepository
 from app.rooms.repository import RoomRepository
 
 logger = logging.getLogger(__name__)
@@ -196,22 +199,80 @@ async def update_booking_status(
         paid = float(booking.paid_amount)
 
         if paid > 0:
-            cancellation_fee = total * settings.CANCELLATION_FEE_PERCENTAGE
-            refund_amount = paid - cancellation_fee  # 70% refunded to guest
-            if refund_amount < 0:
-                refund_amount = 0
+            total_cancellation_fee = total * settings.CANCELLATION_FEE_PERCENTAGE
+            total_refund_amount = max(paid - total_cancellation_fee, 0)
 
             payment_repo = PaymentRepository(db)
+            refund_repo = RefundRepository(db)
             payments = await payment_repo.get_by_booking(booking.id)
-            for p in payments:
-                if p.status == PaymentStatus.completed:
-                    p.cancellation_fee = cancellation_fee
-                    p.notes = (
-                        f"Cancelled - Fee: TK {cancellation_fee:.2f} (30%), "
-                        f"Refunded: TK {refund_amount:.2f} (70% of total)"
+            completed_payments = [
+                p for p in payments if p.status == PaymentStatus.completed
+            ]
+
+            for p in completed_payments:
+                payment_portion = float(p.amount) / paid if paid > 0 else 0
+                payment_fee = total_cancellation_fee * payment_portion
+                payment_fee = min(payment_fee, float(p.amount))
+
+                p.cancellation_fee = payment_fee
+                p.status = PaymentStatus.refunded
+                db.add(p)
+
+                refund_amount = float(p.amount) - payment_fee
+                try:
+                    if (
+                        p.payment_method.value == "Card"
+                        and p.transaction_ref
+                        and not p.transaction_ref.startswith("pi_mock_")
+                    ):
+                        import stripe
+
+                        stripe.api_key = settings.STRIPE_SECRET_KEY
+                        stripe.Refund.create(
+                            payment_intent=p.transaction_ref,
+                            amount=int(refund_amount * 100),
+                        )
+                except Exception as stripe_err:
+                    logger.warning(
+                        f"Stripe refund failed for payment {p.id}: {stripe_err}"
                     )
-                    p.status = PaymentStatus.refunded
-                    db.add(p)
+
+                refund_rec = await refund_repo.create(
+                    payment_id=p.id,
+                    booking_id=booking.id,
+                    amount=refund_amount,
+                    cancellation_fee=payment_fee,
+                    refund_method="Stripe"
+                    if p.payment_method.value == "Card"
+                    else p.payment_method.value,
+                    initiated_by_id=current_user.id,
+                    status=RefundStatus.completed,
+                    notes=f"Cancellation refund for booking {booking.id}",
+                )
+                await refund_repo.complete(
+                    refund_rec.id,
+                    p.transaction_ref or f"cancel_ref_{uuid.uuid4().hex[:8]}",
+                )
+
+            try:
+                email_html = get_refund_notification_html(
+                    guest_name=booking.guest.full_name,
+                    booking_id=str(booking.id),
+                    refund_amount=total_refund_amount,
+                    cancellation_fee=total_cancellation_fee,
+                    payment_method="Multiple",
+                    transaction_ref=", ".join(
+                        [str(p.id)[:8] for p in completed_payments]
+                    ),
+                )
+                send_html_email(
+                    to_email=booking.guest.email,
+                    subject=f"StayEase Resort - Booking #{booking.id} Cancelled",
+                    html_content=email_html,
+                    text_content=f"Your booking has been cancelled. Refund: TK {total_refund_amount:.2f}, Fee: TK {total_cancellation_fee:.2f}.",
+                )
+            except Exception as email_err:
+                logger.warning(f"Failed to send cancellation email: {email_err}")
 
             room_repo = RoomRepository(db)
             for br in booking.booking_rooms:

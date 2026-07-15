@@ -104,7 +104,7 @@ async def revenue_report(
         monthly_data[month_str]["revenue"] += float(row.amount or 0)
         monthly_data[month_str]["count"] += 1
 
-    # Cancellation fees from refunded payments
+    # Cancellation fees from refunded payments (not counted as separate transactions)
     fee_result = await db.execute(
         select(Payment.created_at, Payment.cancellation_fee, Payment.amount).where(
             Payment.status == PaymentStatus.refunded,
@@ -120,7 +120,6 @@ async def revenue_report(
 
         fee = float(row.cancellation_fee or 0)
         monthly_data[month_str]["revenue"] += fee
-        monthly_data[month_str]["count"] += 1
 
     sorted_months = sorted(monthly_data.keys())
     return [
@@ -139,42 +138,48 @@ async def cancellation_fees_report(
     db: AsyncSession = Depends(get_db),
 ):
     """Return cancellation fee revenue data."""
-    result = await db.execute(
-        select(Payment).where(Payment.status == PaymentStatus.refunded)
+    total_result = await db.execute(
+        select(
+            func.sum(Payment.cancellation_fee),
+            func.count(Payment.id),
+        ).where(
+            Payment.status == PaymentStatus.refunded,
+            Payment.cancellation_fee > 0,
+        )
     )
-    payments = result.scalars().all()
+    total_row = total_result.one()
+    total_fees = float(total_row[0] or 0)
+    fee_count = int(total_row[1] or 0)
 
-    total_fees = 0.0
-    fee_count = 0
-    monthly_data = {}
+    monthly_result = await db.execute(
+        select(
+            func.date_trunc("month", Payment.created_at).label("month"),
+            func.sum(Payment.cancellation_fee),
+            func.count(Payment.id),
+        )
+        .where(
+            Payment.status == PaymentStatus.refunded,
+            Payment.cancellation_fee > 0,
+        )
+        .group_by(func.date_trunc("month", Payment.created_at))
+        .order_by(func.date_trunc("month", Payment.created_at))
+    )
 
-    for p in payments:
-        cancellation_fee = float(p.cancellation_fee or 0)
-        if cancellation_fee <= 0:
-            cancellation_fee = float(p.booking.total_amount) * 0.30 if p.booking else 0
+    monthly_data = []
+    for row in monthly_result.all():
+        month_str = row.month.strftime("%Y-%m") if row.month else "Unknown"
+        monthly_data.append(
+            {
+                "month": month_str,
+                "fees": float(row[1] or 0),
+                "count": int(row[2] or 0),
+            }
+        )
 
-        total_fees += cancellation_fee
-        fee_count += 1
-
-        if p.created_at:
-            month_str = p.created_at.strftime("%Y-%m")
-            if month_str not in monthly_data:
-                monthly_data[month_str] = {"fees": 0.0, "count": 0}
-            monthly_data[month_str]["fees"] += cancellation_fee
-            monthly_data[month_str]["count"] += 1
-
-    sorted_months = sorted(monthly_data.keys())
     return {
         "total_fees": total_fees,
         "total_cancellations": fee_count,
-        "monthly": [
-            {
-                "month": m,
-                "fees": monthly_data[m]["fees"],
-                "count": monthly_data[m]["count"],
-            }
-            for m in sorted_months
-        ],
+        "monthly": monthly_data,
     }
 
 

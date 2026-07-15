@@ -77,15 +77,20 @@ async def initiate_refund(
     # Determine refund flow based on method
     refund_method = body.refund_method
     refund_amount = body.amount
-    cancellation_fee = body.cancellation_fee or 0.0
+    cancellation_fee = min(
+        float(booking.total_amount) * settings.CANCELLATION_FEE_PERCENTAGE,
+        refund_amount,
+    )
     refund_status = RefundStatus.pending
     transaction_ref = None
     error_msg = None
 
     if refund_method == "Stripe":
-        # Real Stripe refund
         stripe_ref = payment.transaction_ref or ""
-        if stripe_ref.startswith("pi_") and settings.STRIPE_SECRET_KEY:
+        if stripe_ref.startswith("pi_mock_"):
+            transaction_ref = f"ref_mock_{uuid.uuid4().hex[:12]}"
+            refund_status = RefundStatus.completed
+        elif stripe_ref.startswith("pi_") and settings.STRIPE_SECRET_KEY:
             try:
                 import stripe
 
@@ -101,10 +106,6 @@ async def initiate_refund(
                 error_msg = f"Stripe refund failed: {str(e)}"
                 logger.error(error_msg)
                 refund_status = RefundStatus.failed
-        elif stripe_ref.startswith("pi_mock_"):
-            # Mock mode - mark as completed immediately
-            transaction_ref = f"ref_mock_{uuid.uuid4().hex[:12]}"
-            refund_status = RefundStatus.completed
         else:
             refund_status = RefundStatus.pending
             transaction_ref = None
@@ -136,9 +137,10 @@ async def initiate_refund(
     if refund_status == RefundStatus.failed and error_msg:
         refund = await refund_repo.mark_failed(refund.id, error_msg)
 
-    # Update payment status in DB
-    pay_repo = PaymentRepository(db)
-    await pay_repo.mark_refunded(body.payment_id, cancellation_fee)
+    # Update payment status in DB (only if refund was actually completed)
+    if refund_status == RefundStatus.completed:
+        pay_repo = PaymentRepository(db)
+        await pay_repo.mark_refunded(body.payment_id, cancellation_fee)
 
     # Audit log
     await log_action(
@@ -214,8 +216,8 @@ async def complete_refund(
     )
 
     # Send email notification
-        try:
-            email_html = get_refund_notification_html(
+    try:
+        email_html = get_refund_notification_html(
             guest_name=refund.booking.guest.full_name,
             booking_id=str(refund.booking_id),
             refund_amount=float(refund.amount),
