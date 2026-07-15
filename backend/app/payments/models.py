@@ -23,7 +23,6 @@ class PaymentStatus(str, enum.Enum):
     pending = "Pending"
     completed = "Completed"
     refunded = "Refunded"
-    cancelled_fee = "CancelledFee"
 
 
 class Payment(Base):

@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user, require_role
 from app.auth.models import User
+from app.auth.repository import UserRepository
 from app.bookings.repository import BookingRepository
 from app.core.database import get_db
 from app.core.exceptions import (
@@ -44,7 +45,6 @@ async def _resolve_db_user(
             token_str = auth_header.split(" ", 1)[1]
     if not token_str:
         raise BadRequestException("Authentication required.")
-    from app.auth.repository import UserRepository
 
     payload = decode_token(token_str)
     if payload is None:

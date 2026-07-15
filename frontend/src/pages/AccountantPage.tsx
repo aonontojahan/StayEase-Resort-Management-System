@@ -16,6 +16,7 @@ import {
 // ── Types ─────────────────────────────────────────────────────────────────
 interface RevenueSummary {
   total_revenue: number
+  net_revenue: number
   total_payments: number
   completed_payments: number
   refunded_payments: number
@@ -53,6 +54,11 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
     label: "Cancelled (Fee Retained)",
     color: "bg-purple-100 text-purple-800",
     icon: <TrendingDown className="h-3 w-3" />,
+  },
+  Cancelled: {
+    label: "Cancelled",
+    color: "bg-gray-100 text-gray-800",
+    icon: <XCircle className="h-3 w-3" />,
   },
 }
 
@@ -283,9 +289,9 @@ export const AccountantPage: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-2xl font-bold text-emerald-600">
-                  TK {(summary?.total_revenue ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  TK {(summary?.net_revenue ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </h3>
-                <p className="text-[10px] text-muted-foreground mt-0.5">After refunds deducted</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">After refunds & fees</p>
               </div>
             </div>
 
