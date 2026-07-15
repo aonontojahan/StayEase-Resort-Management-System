@@ -1,7 +1,14 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios"
 import { TokenResponse } from "@/types/auth"
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"
+const API_BASE_URL = import.meta.env.VITE_API_URL
+
+if (!API_BASE_URL) {
+  throw new Error(
+    "VITE_API_URL environment variable is not set. " +
+    "Create a .env file in the frontend directory with VITE_API_URL=http://localhost:8000/api/v1"
+  )
+}
 
 export const api = axios.create({
   baseURL: API_BASE_URL,

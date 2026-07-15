@@ -15,8 +15,9 @@ export function useWebSocket(room = "global") {
   const connect = useCallback(() => {
     const token = localStorage.getItem("accessToken")
     if (!token) return
+    const apiUrl = import.meta.env.VITE_API_URL
 
-    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"
+    if (!apiUrl) return
     const wsUrl = apiUrl.replace("/api/v1", "").replace("http", "ws") + "/api/v1/ws"
     const fullUrl = `${wsUrl}?token=${token}&room=${room}`
 

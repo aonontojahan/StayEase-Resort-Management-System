@@ -190,7 +190,7 @@ export const BookingsPage: React.FC = () => {
           full_name: walkinGuestName.trim(),
           email: walkinGuestEmail.trim(),
           phone_number: walkinGuestPhone.trim() || undefined,
-          password: import.meta.env.VITE_DEFAULT_GUEST_PASSWORD || "Welcome123!",
+          password: import.meta.env.VITE_DEFAULT_GUEST_PASSWORD,
           role_name: "Guest",
         })
         guestId = createRes.data.id

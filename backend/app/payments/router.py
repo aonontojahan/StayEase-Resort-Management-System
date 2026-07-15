@@ -180,27 +180,11 @@ async def create_stripe_intent(
     if amount <= 0:
         raise BadRequestException("Payment amount must be greater than zero.")
 
-    if settings.STRIPE_SECRET_KEY:
-        try:
-            stripe.api_key = settings.STRIPE_SECRET_KEY
-            intent = stripe.PaymentIntent.create(
-                amount=int(amount * 100),
-                currency="usd",
-                metadata={
-                    "booking_id": str(booking.id),
-                    "guest_id": str(booking.guest_id),
-                },
+    if not settings.STRIPE_SECRET_KEY:
+        if settings.ENVIRONMENT != "development":
+            raise BadRequestException(
+                "Stripe is not configured. Set STRIPE_SECRET_KEY in .env to accept payments."
             )
-            return {
-                "client_secret": intent.client_secret,
-                "amount": amount,
-                "currency": "USD",
-                "payment_intent_id": intent.id,
-                "is_mock": False,
-            }
-        except Exception as e:
-            raise BadRequestException(f"Stripe PaymentIntent creation failed: {str(e)}")
-    else:
         mock_id = f"pi_mock_{uuid.uuid4().hex[:12]}"
         return {
             "client_secret": f"mock_secret_{booking.id}_{int(amount)}_{uuid.uuid4().hex[:6]}",
@@ -209,6 +193,26 @@ async def create_stripe_intent(
             "payment_intent_id": mock_id,
             "is_mock": True,
         }
+
+    try:
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+        intent = stripe.PaymentIntent.create(
+            amount=int(amount * 100),
+            currency="usd",
+            metadata={
+                "booking_id": str(booking.id),
+                "guest_id": str(booking.guest_id),
+            },
+        )
+        return {
+            "client_secret": intent.client_secret,
+            "amount": amount,
+            "currency": "USD",
+            "payment_intent_id": intent.id,
+            "is_mock": False,
+        }
+    except Exception as e:
+        raise BadRequestException(f"Stripe PaymentIntent creation failed: {str(e)}")
 
 
 @router.post("/stripe/confirm")
@@ -454,10 +458,20 @@ async def stripe_webhook(
         except Exception as e:
             logger.error(f"Stripe webhook signature verification failed: {e}")
             return JSONResponse(status_code=400, content={"error": "Invalid signature"})
-    else:
+    elif settings.ENVIRONMENT == "development":
         import json
 
         event = json.loads(payload)
+        logger.warning(
+            "Stripe webhook signature verification skipped in development mode."
+        )
+    else:
+        logger.error(
+            "Webhook received without STRIPE_WEBHOOK_SECRET configured — rejecting."
+        )
+        return JSONResponse(
+            status_code=400, content={"error": "Webhook secret not configured"}
+        )
 
     event_type = event.get("type") if isinstance(event, dict) else event.type
 

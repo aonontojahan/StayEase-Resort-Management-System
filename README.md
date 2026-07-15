@@ -81,28 +81,6 @@ Click **Sign In** from the navbar to log in.
 
 ---
 
-## 🔑 Default Accounts
-
-These accounts are seeded automatically in `development` mode.
-
-### Resort Owner (Admin)
-| Field | Value |
-|-------|-------|
-| Email | `aonontojahan@gmail.com` |
-| Password | `aonontojahan` |
-| Access | Full system — all tabs, analytics, staff management |
-
-### Guest (Demo)
-| Field | Value |
-|-------|-------|
-| Email | `guest@stayease.com` |
-| Password | `guest123` |
-| Access | Browse rooms, my bookings, payment history |
-
-> Guests can also **self-register** at `/register`.
-
----
-
 ## 🧪 Running Tests
 
 ### Backend

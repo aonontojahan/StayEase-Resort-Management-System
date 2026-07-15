@@ -272,7 +272,7 @@ export const BrowseRoomsPage: React.FC = () => {
   const openInvoice = (invId: string) => {
     const token = localStorage.getItem("accessToken")
     window.open(
-      `${import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1"}/invoices/${invId}/html?token=${token}`,
+      `${import.meta.env.VITE_API_URL}/invoices/${invId}/html?token=${token}`,
       "_blank"
     )
   }
@@ -616,8 +616,8 @@ export const BrowseRoomsPage: React.FC = () => {
 
           {stripeIntent?.is_mock && (
             <div className="rounded-lg bg-amber-50 border border-amber-200/50 p-3.5 text-xs text-amber-800">
-              <p className="font-bold flex items-center gap-1"><Info className="h-4 w-4" /> Demo Mode</p>
-              <p className="mt-1">Demo mode - any card works</p>
+              <p className="font-bold flex items-center gap-1"><Info className="h-4 w-4" /> Development Mode</p>
+              <p className="mt-1">Stripe is not configured — payments are processed in mock mode.</p>
             </div>
           )}
 
@@ -657,8 +657,8 @@ export const BrowseRoomsPage: React.FC = () => {
                     <p className="font-semibold tracking-wide">{cardName.toUpperCase() || "YOUR NAME"}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[8px] tracking-wider uppercase opacity-60 font-mono">Demo</p>
-                    <p className="font-semibold font-mono">Test Mode</p>
+                    <p className="text-[8px] tracking-wider uppercase opacity-60 font-mono">Card</p>
+                    <p className="font-semibold font-mono">Payment</p>
                   </div>
                 </div>
               </div>

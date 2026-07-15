@@ -1,7 +1,10 @@
+import logging
 import os
 from typing import Any, List, Optional
 from pydantic import AnyHttpUrl, EmailStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -31,8 +34,9 @@ class Settings(BaseSettings):
             import secrets
 
             generated = secrets.token_urlsafe(64)
-            print(f"WARNING: No SECRET_KEY set. Generated temporary key: {generated}")
-            print("Set SECRET_KEY in your .env file for persistence.")
+            logger.warning(
+                "No SECRET_KEY set in .env. Generated a temporary key — set SECRET_KEY for persistence."
+            )
             return generated
         raise ValueError(
             "SECRET_KEY must be set in .env. "
@@ -56,12 +60,21 @@ class Settings(BaseSettings):
     # Cancellation fee percentage (e.g., 0.30 = 30%)
     CANCELLATION_FEE_PERCENTAGE: float = 0.30
 
-    # CORS Origins
+    # CORS Origins — override via env var as JSON array or comma-separated list
     BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:3000",
     ]
+
+    @field_validator("BACKEND_CORS_ORIGINS", mode="before")
+    @classmethod
+    def assemble_cors_origins(cls, v: Any) -> List[str]:
+        if isinstance(v, str) and not v.startswith("["):
+            return [i.strip() for i in v.split(",")]
+        if isinstance(v, (list, str)):
+            return v
+        raise ValueError(v)
 
     # Rate Limiting
     RATE_LIMIT_MAX_REQUESTS: int = 20

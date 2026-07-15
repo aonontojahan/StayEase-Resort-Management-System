@@ -147,11 +147,7 @@ async def seed_db(db: AsyncSession):
                     is_verified=True,
                 )
                 db.add(owner_user)
-            logger.info("=" * 60)
-            logger.info(f"DEFAULT RESORT OWNER:")
-            logger.info(f"  Email:    {owner_email}")
-            logger.info(f"  Password: {owner_password}")
-            logger.info("=" * 60)
+            logger.info("Default resort owner account seeded.")
 
         await db.commit()
         logger.info(
