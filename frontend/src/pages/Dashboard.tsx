@@ -3,7 +3,7 @@ import { useAuth } from "@/store/AuthContext"
 import { api } from "@/services/api"
 import { OccupancyReport, BookingsSummary, RevenueReport } from "@/types/api"
 import { 
-  Home, BookOpen, BedDouble, Sparkles, CreditCard, FileText, Menu, X, Settings,
+  Home, BookOpen, BedDouble, Sparkles, CreditCard, FileText, Menu, X,
   UserCheck, UserCircle, LogIn, LogOut, Sun, Moon
 } from "lucide-react"
 
@@ -19,7 +19,6 @@ import { MyBookingsPage } from "@/pages/MyBookingsPage"
 import { BrowseRoomsPage } from "@/pages/BrowseRoomsPage"
 import { PaymentHistoryPage } from "@/pages/PaymentHistoryPage"
 import { HousekeepingTasksPage } from "@/pages/HousekeepingTasksPage"
-import { SettingsPage } from "@/pages/SettingsPage"
 import { StatsGridSkeleton } from "@/components/Skeleton"
 import { UserMenu } from "@/components/UserMenu"
 import { NotificationBell } from "@/components/NotificationBell"
@@ -129,11 +128,6 @@ export const Dashboard: React.FC = () => {
             <span>Invoices</span>
           </button>
 
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground px-3 pt-3 pb-1">System</p>
-          <button onClick={() => handleTabChange("Settings")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Settings" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
-            <Settings className="h-4 w-4" />
-            <span>Settings</span>
-          </button>
         </>
       ) : user.role.name === "Guest" ? (
         <>
@@ -153,20 +147,12 @@ export const Dashboard: React.FC = () => {
             <FileText className="h-4 w-4" />
             <span>Invoices</span>
           </button>
-          <button onClick={() => handleTabChange("Settings")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Settings" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
-            <Settings className="h-4 w-4" />
-            <span>Settings</span>
-          </button>
         </>
       ) : user.role.name === "Housekeeping" ? (
         <>
           <button onClick={() => handleTabChange("Housekeeping Tasks")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Housekeeping Tasks" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
             <Sparkles className="h-4 w-4" />
             <span>Housekeeping Tasks</span>
-          </button>
-          <button onClick={() => handleTabChange("Settings")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Settings" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
-            <Settings className="h-4 w-4" />
-            <span>Settings</span>
           </button>
         </>
       ) : user.role.name === "Accountant" ? (
@@ -179,11 +165,6 @@ export const Dashboard: React.FC = () => {
           <button onClick={() => handleTabChange("Invoices")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Invoices" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
             <FileText className="h-4 w-4" />
             <span>Invoices</span>
-          </button>
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground px-3 pt-3 pb-1">System</p>
-          <button onClick={() => handleTabChange("Settings")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Settings" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
-            <Settings className="h-4 w-4" />
-            <span>Settings</span>
           </button>
         </>
       ) : null}
@@ -200,8 +181,6 @@ export const Dashboard: React.FC = () => {
       case "Housekeeping": return <HousekeepingPage />
       case "Payments": return user.role.name === "Accountant" ? <AccountantPage /> : <PaymentsPage />
       case "Invoices": return <InvoicesPage />
-      case "Settings":
-        return <SettingsPage />
       case "My Bookings": return <MyBookingsPage />
       case "Browse Rooms": return <BrowseRoomsPage />
       case "Payment History": return <PaymentHistoryPage />

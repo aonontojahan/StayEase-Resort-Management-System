@@ -19,6 +19,7 @@ interface RevenueSummary {
   total_payments: number
   completed_payments: number
   refunded_payments: number
+  cancellation_fees: number
 }
 
 // ── Payment form schema ───────────────────────────────────────────────────

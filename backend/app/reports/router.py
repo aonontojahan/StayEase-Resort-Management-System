@@ -84,7 +84,8 @@ async def revenue_report(
     _: User = require_role(ANALYTICS_ROLES),
     db: AsyncSession = Depends(get_db),
 ):
-    """Return monthly revenue data."""
+    """Return monthly revenue data including cancellation fees."""
+    # Completed payments
     result = await db.execute(
         select(Payment.created_at, Payment.amount).where(
             Payment.status == PaymentStatus.completed
@@ -101,6 +102,24 @@ async def revenue_report(
             monthly_data[month_str] = {"revenue": 0.0, "count": 0}
 
         monthly_data[month_str]["revenue"] += float(row.amount or 0)
+        monthly_data[month_str]["count"] += 1
+
+    # Cancellation fees from refunded payments
+    fee_result = await db.execute(
+        select(Payment.created_at, Payment.cancellation_fee, Payment.amount).where(
+            Payment.status == PaymentStatus.refunded,
+            Payment.cancellation_fee > 0,
+        )
+    )
+    for row in fee_result.all():
+        if not row.created_at:
+            continue
+        month_str = row.created_at.strftime("%Y-%m")
+        if month_str not in monthly_data:
+            monthly_data[month_str] = {"revenue": 0.0, "count": 0}
+
+        fee = float(row.cancellation_fee or 0)
+        monthly_data[month_str]["revenue"] += fee
         monthly_data[month_str]["count"] += 1
 
     sorted_months = sorted(monthly_data.keys())

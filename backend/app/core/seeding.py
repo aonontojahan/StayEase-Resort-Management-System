@@ -124,13 +124,19 @@ async def seed_db(db: AsyncSession):
         from app.core.security import get_password_hash
 
         owner_email = os.environ.get("OWNER_EMAIL", "admin@stayease.com")
+        owner_password = os.environ.get("OWNER_PASSWORD") or _generate_password()
         owner_role = await role_repo.get_by_name("Resort Owner")
         if owner_role:
             user_repo = UserRepository(db)
             owner_user = await user_repo.get_by_email(owner_email)
-            if not owner_user:
-                seed_password = _generate_password()
-                hashed_pw = get_password_hash(seed_password)
+            hashed_pw = get_password_hash(owner_password)
+            if owner_user:
+                owner_user.hashed_password = hashed_pw
+                owner_user.is_active = True
+                owner_user.is_verified = True
+                db.add(owner_user)
+                logger.info(f"Updated password for {owner_email}")
+            else:
                 owner_user = User(
                     email=owner_email,
                     hashed_password=hashed_pw,
@@ -141,15 +147,11 @@ async def seed_db(db: AsyncSession):
                     is_verified=True,
                 )
                 db.add(owner_user)
-                logger.info("=" * 60)
-                logger.info(f"DEFAULT RESORT OWNER CREATED:")
-                logger.info(f"  Email:    {owner_email}")
-                logger.info(
-                    f"  Credentials: Check .env file or contact system administrator."
-                )
-                logger.info("=" * 60)
-            else:
-                logger.info(f"Default Resort Owner {owner_email} already exists.")
+            logger.info("=" * 60)
+            logger.info(f"DEFAULT RESORT OWNER:")
+            logger.info(f"  Email:    {owner_email}")
+            logger.info(f"  Password: {owner_password}")
+            logger.info("=" * 60)
 
         await db.commit()
         logger.info(

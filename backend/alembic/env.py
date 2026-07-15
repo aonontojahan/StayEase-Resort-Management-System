@@ -16,6 +16,8 @@ import app.bookings.models  # noqa
 import app.housekeeping.models  # noqa
 import app.payments.models  # noqa
 import app.invoices.models  # noqa
+import app.refunds.models  # noqa
+import app.audit.models  # noqa
 
 config = context.config
 

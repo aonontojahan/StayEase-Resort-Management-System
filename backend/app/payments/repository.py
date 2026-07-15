@@ -117,7 +117,7 @@ class PaymentRepository:
         cancellation_fees = float(fee_result.scalar() or 0)
 
         return RevenueSummary(
-            total_revenue=completed - refunded + cancellation_fees,
+            total_revenue=completed + cancellation_fees,
             total_payments=total_count,
             completed_payments=completed,
             refunded_payments=refunded,

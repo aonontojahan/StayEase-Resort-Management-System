@@ -2,73 +2,133 @@
 
 A modern cloud-based Resort Management System for bookings, operations, and guest management.
 
-## 🚀 Quick Start Guide
+## 📋 Prerequisites
 
-Follow these steps to run the StayEase project locally on your machine. The project is split into a **Backend** (FastAPI) and a **Frontend** (React/Vite).
-
-### 1. Backend Setup (FastAPI)
-
-1. Open a terminal and navigate to the `backend` directory:
-   ```bash
-   cd backend
-   ```
-2. Activate your virtual environment:
-   ```bash
-   # On Windows:
-   source .venv/Scripts/activate
-   ```
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. Create a `.env` file by copying the template:
-   ```bash
-   cp .env.example .env
-   ```
-   *(Ensure `ENVIRONMENT=development` is set in the `.env` file so the database automatically seeds!)*
-5. Run the FastAPI development server:
-   ```bash
-   uvicorn app.main:app --reload
-   ```
-   The backend will be available at `http://localhost:8000`. 
-   *(The database tables and default owner account will be created automatically on startup).*
-
-### 2. Frontend Setup (React/Vite)
-
-1. Open a **new, separate** terminal window and navigate to the `frontend` directory:
-   ```bash
-   cd frontend
-   ```
-2. Install the Node modules:
-   ```bash
-   npm install
-   ```
-3. Start the Vite development server:
-   ```bash
-   npm run dev
-   ```
-4. Open your Chrome browser and navigate to `http://localhost:5173`.
+| Tool | Version | Check with |
+|------|---------|------------|
+| Python | 3.10+ | `python --version` |
+| Node.js | 18+ | `node --version` |
+| npm | 9+ | `npm --version` |
+| PostgreSQL | 14+ (or use Neon cloud) | `psql --version` |
 
 ---
 
-## 🔑 Default Sign-in Information
+## 🚀 Quick Start Guide
 
-When running in development mode, the database seeds the following accounts automatically on startup.
+The project is split into a **Backend** (FastAPI) and a **Frontend** (React/Vite). You need **two terminals** — one for each.
 
-> [!IMPORTANT]
-> Always use the **full email address** when logging in. The login page also shows these credentials as a reminder.
+### 1. Backend Setup (FastAPI)
+
+```bash
+# Navigate to backend
+cd backend
+
+# Create and activate virtual environment
+python -m venv .venv
+
+# ── Activate it ──
+# Windows (Git Bash):
+source .venv/Scripts/activate
+# Windows (CMD):
+.venv\Scripts\activate
+# Windows (PowerShell):
+.venv\Scripts\Activate.ps1
+# macOS / Linux:
+source .venv/bin/activate
+
+# Install dependencies (psutil included in requirements.txt)
+pip install -r requirements.txt
+
+# Create environment config from template
+cp .env.example .env
+```
+
+> **IMPORTANT:** Open `.env` and set `ENVIRONMENT=development`. The included `.env` already has this configured with a Neon PostgreSQL database. If you want to use a **local database**, uncomment the local `DATABASE_URL` line and comment out the Neon one.
+
+```bash
+# Start the backend
+uvicorn app.main:app --reload
+```
+
+The backend starts at **`http://localhost:8000`**.  
+On first run, tables are created and default accounts are seeded automatically.
+
+---
+
+### 2. Frontend Setup (React/Vite)
+
+Open a **second terminal**.
+
+```bash
+# Navigate to frontend
+cd frontend
+
+# Install dependencies (use legacy-peer-deps to avoid React 18 peer conflicts)
+npm install --legacy-peer-deps
+
+# Start the Vite dev server
+npm run dev
+```
+
+The frontend starts at **`http://localhost:5173`**.
+
+---
+
+### 3. Open in Browser
+
+Go to **[http://localhost:5173](http://localhost:5173)** — the Landing Page loads first.  
+Click **Sign In** from the navbar to log in.
+
+---
+
+## 🔑 Default Accounts
+
+These accounts are seeded automatically in `development` mode.
 
 ### Resort Owner (Admin)
-- **Email:** `aonontojahan@gmail.com`
-- **Password:** `aonontojahan`
-- **Access:** Full dashboard — Staff Management, Rooms, Bookings, Guests, Housekeeping, Payments, Reports.
+| Field | Value |
+|-------|-------|
+| Email | `aonontojahan@gmail.com` |
+| Password | `aonontojahan` |
+| Access | Full system — all tabs, analytics, staff management |
 
 ### Guest (Demo)
-- **Email:** `guest@stayease.com`
-- **Password:** `guest123`
-- **Access:** Guest portal — Browse Rooms, My Bookings, Payment History.
+| Field | Value |
+|-------|-------|
+| Email | `guest@stayease.com` |
+| Password | `guest123` |
+| Access | Browse rooms, my bookings, payment history |
 
-> **New guests** can also self-register at `/register` and will be automatically logged in.
+> Guests can also **self-register** at `/register`.
+
+---
+
+## 🧪 Running Tests
+
+### Backend
+```bash
+cd backend
+source .venv/Scripts/activate     # or your platform's activate command
+pytest -v
+```
+
+### Frontend
+```bash
+cd frontend
+npm test
+```
+
+---
+
+## 🛠 Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| `ModuleNotFoundError: No module named 'psutil'` | `pip install psutil` — or re-run `pip install -r requirements.txt` |
+| `Cannot find package 'vitest'` | `npm install -D vitest --legacy-peer-deps` |
+| `database "stayease" does not exist` | Create the database: `createdb stayease` or switch to the Neon URL in `.env` |
+| `Port 8000 already in use` | Kill the process or use: `uvicorn app.main:app --reload --port 8001` |
+| `Port 5173 already in use` | Vite will auto-prompt to use a different port; press **y** |
 
 ---
 
@@ -76,4 +136,8 @@ When running in development mode, the database seeds the following accounts auto
 
 - **Guest Portal:** Browse luxury resort rooms, book stays, and view payment history.
 - **Resort Owner Dashboard:** View analytics, occupancy reports, and manage all staff across the platform.
-- **Premium Design:** Implements a modern Emerald/Gold luxury theme for a high-end user experience.
+- **Role-Based Access:** Resort Owner, Manager, Receptionist, Housekeeping, Accountant, Guest.
+- **Real-Time Updates:** WebSocket-powered housekeeping task notifications and live refresh.
+- **Dark Mode:** Toggle in the sidebar; persists to localStorage.
+- **PCI-Compliant Payments:** Stripe integration with full refund workflow.
+- **Premium Design:** Emerald/Gold luxury theme with Inter + Playfair Display typography.
