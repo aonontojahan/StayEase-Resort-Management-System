@@ -125,7 +125,6 @@ async def upload_avatar(
 
         upload_dir = os.path.join("uploads", "avatars", str(current_user.id))
         os.makedirs(upload_dir, exist_ok=True)
-        contents = await file.read()
         file_hash = hashlib.md5(contents).hexdigest()[:12]
         ext = file.filename.split(".")[-1] if "." in file.filename else "jpg"
         filename = f"{file_hash}.{ext}"

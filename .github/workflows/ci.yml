@@ -13,21 +13,6 @@ jobs:
       run:
         working-directory: backend
 
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: stayease_test
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -38,7 +23,6 @@ jobs:
       - run: pip install pytest pytest-asyncio httpx aiosqlite
       - run: python -m pytest tests/
         env:
-          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/stayease_test
           SECRET_KEY: test-secret-key-for-ci-1234567890abcdef
 
   frontend:
@@ -55,4 +39,5 @@ jobs:
           cache: "npm"
       - run: npm ci
       - run: npm run lint
+      - run: npm test
       - run: npm run build

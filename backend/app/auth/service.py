@@ -1,6 +1,7 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Tuple
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import User
@@ -14,6 +15,8 @@ from app.core.security import (
     get_password_hash,
     verify_password,
 )
+from app.core.config import settings
+from app.core.email import send_html_email
 
 
 class AuthService:
@@ -22,6 +25,125 @@ class AuthService:
         self.user_repo = UserRepository(db)
         self.role_repo = RoleRepository(db)
         self.blacklist_repo = TokenBlacklistRepository(db)
+
+    async def _send_reset_email(self, email: str, token: str) -> None:
+        reset_link = f"{settings.CLIENT_URL or 'http://localhost:5173'}/reset-password?token={token}"
+        html = f"""
+        <h2>Password Reset Request</h2>
+        <p>Click the link below to reset your password. This link expires in 1 hour.</p>
+        <p><a href="{reset_link}">{reset_link}</a></p>
+        <p>If you didn't request this, please ignore this email.</p>
+        """
+        send_html_email(
+            to_email=email,
+            subject="StayEase Resort - Password Reset",
+            html_content=html,
+            text_content=f"Reset your password here: {reset_link}",
+        )
+
+    async def _send_verification_email(self, email: str, token: str) -> None:
+        verify_link = f"{settings.CLIENT_URL or 'http://localhost:5173'}/verify-email?token={token}"
+        html = f"""
+        <h2>Verify Your Email</h2>
+        <p>Click the link below to verify your email address.</p>
+        <p><a href="{verify_link}">{verify_link}</a></p>
+        """
+        send_html_email(
+            to_email=email,
+            subject="StayEase Resort - Email Verification",
+            html_content=html,
+            text_content=f"Verify your email here: {verify_link}",
+        )
+
+    async def initiate_password_reset(self, email: str) -> None:
+        user = await self.user_repo.get_by_email(email)
+        if not user:
+            return
+        token = create_access_token(
+            subject=user.id,
+            expires_delta=timedelta(hours=1),
+        )
+        payload = decode_token(token)
+        jti = payload.get("jti", "")
+        expires_at = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
+        await self.blacklist_repo.add(
+            jti=jti, token_type="password_reset", expires_at=expires_at
+        )
+        await self._send_reset_email(email, token)
+
+    async def reset_password(self, token: str, new_password: str) -> None:
+        payload = decode_token(token)
+        if not payload or payload.get("type") != "access":
+            raise BadRequestException("Invalid or expired reset token.")
+
+        jti = payload.get("jti")
+        if jti and await self.blacklist_repo.is_blacklisted(jti):
+            raise BadRequestException("Reset token has already been used or expired.")
+
+        user_id = payload.get("sub")
+        if not user_id:
+            raise BadRequestException("Invalid reset token payload.")
+
+        user = await self.user_repo.get_by_id(uuid.UUID(user_id))
+        if not user:
+            raise BadRequestException("User not found.")
+
+        if jti:
+            await self.blacklist_repo.add(
+                jti=jti,
+                token_type="password_reset",
+                expires_at=datetime.now(timezone.utc),
+            )
+
+        user.hashed_password = get_password_hash(new_password)
+        self.db.add(user)
+        await self.db.flush()
+
+    async def verify_email(self, token: str) -> None:
+        payload = decode_token(token)
+        if not payload or payload.get("type") != "access":
+            raise BadRequestException("Invalid or expired verification token.")
+
+        jti = payload.get("jti")
+        if jti and await self.blacklist_repo.is_blacklisted(jti):
+            raise BadRequestException(
+                "Verification token has already been used or expired."
+            )
+
+        user_id = payload.get("sub")
+        if not user_id:
+            raise BadRequestException("Invalid verification token payload.")
+
+        user = await self.user_repo.get_by_id(uuid.UUID(user_id))
+        if not user:
+            raise BadRequestException("User not found.")
+
+        if jti:
+            await self.blacklist_repo.add(
+                jti=jti,
+                token_type="email_verify",
+                expires_at=datetime.now(timezone.utc),
+            )
+
+        user.is_verified = True
+        self.db.add(user)
+        await self.db.flush()
+
+    async def resend_verification(self, email: str) -> None:
+        user = await self.user_repo.get_by_email(email)
+        if not user or user.is_verified:
+            return
+        token = create_access_token(
+            subject=user.id,
+            expires_delta=timedelta(hours=24),
+        )
+        payload = decode_token(token)
+        jti = payload.get("jti", "")
+        expires_at = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
+        await self.blacklist_repo.add(
+            jti=jti, token_type="email_verify", expires_at=expires_at
+        )
+        await self._send_verification_email(email, token)
 
     async def register_guest(self, user_in: UserCreate) -> User:
         existing_user = await self.user_repo.get_by_email(user_in.email)
@@ -95,18 +217,19 @@ class AuthService:
         )
         return updated_user
 
-    async def logout(self, refresh_token: str) -> None:
-        payload = decode_token(refresh_token)
-        if payload and payload.get("jti"):
-            jti = payload["jti"]
-            exp = payload.get("exp")
-            expires_at = (
-                datetime.fromtimestamp(exp, tz=timezone.utc)
-                if exp
-                else datetime.now(timezone.utc)
-            )
-            await self.blacklist_repo.add(
-                jti=jti,
-                token_type="refresh",
-                expires_at=expires_at,
-            )
+    async def logout(self, refresh_token: str, access_token: str) -> None:
+        for token, token_type in [(refresh_token, "refresh"), (access_token, "access")]:
+            payload = decode_token(token)
+            if payload and payload.get("jti"):
+                jti = payload["jti"]
+                exp = payload.get("exp")
+                expires_at = (
+                    datetime.fromtimestamp(exp, tz=timezone.utc)
+                    if exp
+                    else datetime.now(timezone.utc)
+                )
+                await self.blacklist_repo.add(
+                    jti=jti,
+                    token_type=token_type,
+                    expires_at=expires_at,
+                )

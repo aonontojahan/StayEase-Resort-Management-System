@@ -162,7 +162,7 @@ async def logout(
     db: AsyncSession = Depends(get_db),
 ):
     auth_service = AuthService(db)
-    await auth_service.logout(body.refresh_token)
+    await auth_service.logout(body.refresh_token, body.access_token)
     return {"detail": "Logged out successfully"}
 
 

@@ -43,3 +43,9 @@ logs/
 
 # ---- Misc Artifacts ----
 nul
+
+# ---- Cache & Build Artifacts ----
+.ruff_cache/
+backend.log
+backend/tests/__pycache__/
+dist/

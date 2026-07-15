@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 import logging
 from typing import List
@@ -213,10 +214,8 @@ async def complete_refund(
     )
 
     # Send email notification
-    try:
-        import asyncio
-
-        email_html = get_refund_notification_html(
+        try:
+            email_html = get_refund_notification_html(
             guest_name=refund.booking.guest.full_name,
             booking_id=str(refund.booking_id),
             refund_amount=float(refund.amount),
@@ -237,6 +236,3 @@ async def complete_refund(
         logger.warning(f"Failed to send refund email: {e}")
 
     return result
-
-
-import asyncio

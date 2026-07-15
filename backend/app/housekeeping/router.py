@@ -1,3 +1,4 @@
+import logging
 import uuid
 from typing import List
 
@@ -14,6 +15,8 @@ from app.core.pagination import PaginationParams
 from app.housekeeping.models import TaskStatus
 from app.housekeeping.repository import HousekeepingRepository
 from app.housekeeping.schemas import TaskCreate, TaskRead, TaskStatusUpdate
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/housekeeping", tags=["Housekeeping"])
 
@@ -64,8 +67,8 @@ async def create_task(
                 "room_number": task.room.room_number if task.room else "Unknown",
             },
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"WebSocket broadcast failed: {e}")
     return task
 
 

@@ -11,8 +11,13 @@ from app.auth.dependencies import get_current_user, require_role
 from app.auth.models import User
 from app.bookings.repository import BookingRepository
 from app.core.database import get_db
-from app.core.exceptions import BadRequestException, NotFoundException
+from app.core.exceptions import (
+    BadRequestException,
+    NotFoundException,
+    UnauthorizedException,
+)
 from app.core.pagination import PaginationParams
+from app.core.security import decode_token
 from app.invoices.models import InvoiceStatus
 from app.invoices.repository import InvoiceRepository
 from app.invoices.pdf import generate_invoice_pdf
@@ -39,7 +44,6 @@ async def _resolve_db_user(
             token_str = auth_header.split(" ", 1)[1]
     if not token_str:
         raise BadRequestException("Authentication required.")
-    from app.core.security import decode_token
     from app.auth.repository import UserRepository
 
     payload = decode_token(token_str)

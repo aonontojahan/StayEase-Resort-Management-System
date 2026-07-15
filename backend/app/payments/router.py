@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import uuid
 import stripe
 from typing import List
@@ -29,6 +30,8 @@ from app.payments.schemas import (
     StripePaymentConfirm,
 )
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
 
@@ -391,7 +394,11 @@ async def pay_via_mobile_banking(
         check_out=str(booking.booking_rooms[0].check_out_date)
         if booking.booking_rooms
         else "",
-        nights=1,
+        nights=max(
+            (br.check_out_date - br.check_in_date).days for br in booking.booking_rooms
+        )
+        if booking.booking_rooms
+        else 1,
         total_amount=booking_total,
         amount_paid=new_paid,
         remaining_balance=new_remaining,

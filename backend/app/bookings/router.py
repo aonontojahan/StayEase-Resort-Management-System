@@ -1,3 +1,4 @@
+import logging
 import uuid
 from typing import List
 
@@ -23,12 +24,15 @@ from app.core.exceptions import (
     ForbiddenException,
     NotFoundException,
 )
+from app.core.config import settings
 from app.core.pagination import PaginationParams
 from app.invoices.repository import InvoiceRepository
 from app.invoices.schemas import InvoiceCreate, InvoiceItemCreate
 from app.payments.models import PaymentStatus
 from app.payments.repository import PaymentRepository
 from app.rooms.repository import RoomRepository
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/bookings", tags=["Bookings"])
 
@@ -192,7 +196,7 @@ async def update_booking_status(
         paid = float(booking.paid_amount)
 
         if paid > 0:
-            cancellation_fee = total * 0.30  # 30% fee kept by resort
+            cancellation_fee = total * settings.CANCELLATION_FEE_PERCENTAGE
             refund_amount = paid - cancellation_fee  # 70% refunded to guest
             if refund_amount < 0:
                 refund_amount = 0
@@ -257,8 +261,8 @@ async def update_booking_status(
                         "assigned_to": str(assigned_hk_id) if assigned_hk_id else None,
                     },
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"WebSocket broadcast failed: {e}")
 
     return await repo.update_status(booking, new_status)
 
@@ -348,8 +352,8 @@ async def check_out_booking(
                     "assigned_to": str(assigned_hk_id) if assigned_hk_id else None,
                 },
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"WebSocket broadcast failed: {e}")
 
     result = await repo.update_status(booking, BookingStatus.checked_out)
 
@@ -370,6 +374,7 @@ async def check_out_booking(
 @router.get("/guests", response_model=List[UserRead])
 async def list_guests(
     search: str = "",
+    pagination: PaginationParams = Depends(),
     _: User = require_role(STAFF_ROLES),
     db: AsyncSession = Depends(get_db),
 ):
@@ -384,10 +389,29 @@ async def list_guests(
                 User.phone_number.ilike(f"%{search}%"),
             )
         )
-    query = query.order_by(User.full_name).limit(50)
+    count_query = select(User.id).where(User.role.has(name="Guest"))
+    if search:
+        count_query = count_query.where(
+            or_(
+                User.full_name.ilike(f"%{search}%"),
+                User.email.ilike(f"%{search}%"),
+                User.phone_number.ilike(f"%{search}%"),
+            )
+        )
+    total_result = await db.execute(count_query)
+    total = len(total_result.scalars().all())
+    query = (
+        query.order_by(User.full_name).offset(pagination.skip).limit(pagination.limit)
+    )
     result = await db.execute(query)
     users = result.scalars().all()
-    return [UserRead.model_validate(u) for u in users]
+    return JSONResponse(
+        content=jsonable_encoder([UserRead.model_validate(u) for u in users]),
+        headers={
+            "X-Total-Count": str(total),
+            "Access-Control-Expose-Headers": "X-Total-Count",
+        },
+    )
 
 
 @router.delete("/{booking_id}", status_code=status.HTTP_204_NO_CONTENT)

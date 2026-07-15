@@ -53,6 +53,9 @@ class Settings(BaseSettings):
             return v
         return v
 
+    # Cancellation fee percentage (e.g., 0.30 = 30%)
+    CANCELLATION_FEE_PERCENTAGE: float = 0.30
+
     # CORS Origins
     BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost:5173",
@@ -72,6 +75,9 @@ class Settings(BaseSettings):
     # Stripe Config
     STRIPE_SECRET_KEY: Optional[str] = None
     STRIPE_WEBHOOK_SECRET: Optional[str] = None
+
+    # Client URL (for password reset / email verification links)
+    CLIENT_URL: str = "http://localhost:5173"
 
     # Sentry Config
     SENTRY_DSN: Optional[str] = None
