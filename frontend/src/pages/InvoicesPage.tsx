@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react"
-import { api } from "@/services/api"
+import { api, apiGet } from "@/services/api"
 import { Invoice as InvoiceType, InvoiceSummary } from "@/types/api"
 
 interface InvoiceWithBooking extends InvoiceType {
@@ -13,7 +13,7 @@ import { useToast } from "@/components/Toast"
 import { Modal } from "@/components/Modal"
 import {
   FileText, Loader2, RefreshCw, Eye, Download,
-  CheckCircle2, Clock, XCircle, AlertCircle, DollarSign,
+  CheckCircle2, Clock, XCircle, DollarSign,
 } from "lucide-react"
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
@@ -48,8 +48,8 @@ export const InvoicesPage: React.FC = () => {
     try {
       const endpoint = isStaff ? "/invoices/" : "/invoices/my"
       const [invRes, sumRes] = await Promise.all([
-        api.get<InvoiceWithBooking[]>(endpoint),
-        isStaff ? api.get<InvoiceSummary>("/invoices/summary") : Promise.resolve(null),
+        apiGet<InvoiceWithBooking[]>(endpoint),
+        isStaff ? apiGet<InvoiceSummary>("/invoices/summary") : Promise.resolve(null),
       ])
       setInvoices(invRes.data)
       if (sumRes) setSummary(sumRes.data)
@@ -84,7 +84,7 @@ export const InvoicesPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2.5">
@@ -144,9 +144,22 @@ export const InvoicesPage: React.FC = () => {
             </div>
 
             {invoices.length === 0 ? (
-              <div className="p-12 text-center text-muted-foreground">
-                <AlertCircle className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                <p className="font-medium">No invoices found</p>
+              <div className="flex flex-col items-center justify-center py-24 px-6 rounded-xl border-2 border-dashed bg-card/50 shadow-sm">
+                <div className="rounded-full bg-primary/10 p-5 mb-5">
+                  <FileText className="h-10 w-10 text-primary" />
+                </div>
+                <h3 className="text-xl font-bold text-foreground">No invoices found</h3>
+                <p className="text-muted-foreground mt-1.5 mb-6 text-center max-w-sm">{isStaff ? "No invoices have been generated yet." : "No invoices yet. Invoices appear once a booking is completed."}</p>
+                {!isStaff && (
+                  <a
+                    href="/browse-rooms"
+                    onClick={(e) => { e.preventDefault(); window.dispatchEvent(new CustomEvent("navigate-tab", { detail: "Browse Rooms" })) }}
+                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-md hover:bg-primary/90 transition-all hover:shadow-lg active:scale-[0.98]"
+                  >
+                    <FileText className="h-4 w-4" />
+                    Browse Rooms
+                  </a>
+                )}
               </div>
             ) : (
               <div className="overflow-x-auto">

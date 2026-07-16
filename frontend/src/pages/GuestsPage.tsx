@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react"
-import { api } from "@/services/api"
+import { api, apiGet } from "@/services/api"
 import { User } from "@/types/auth"
 import { TableSkeleton } from "@/components/Skeleton"
 import { useToast } from "@/components/Toast"
@@ -26,7 +26,7 @@ export const GuestsPage: React.FC = () => {
   const fetchUsers = async () => {
     setLoading(true)
     try {
-      const res = await api.get<User[]>("/auth/users")
+      const res = await apiGet<User[]>("/auth/users")
       setUsers(res.data)
     } catch {
       toastError("Failed to load users.")

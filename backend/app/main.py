@@ -7,6 +7,7 @@ import sentry_sdk
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 
 from app.auth.router import router as auth_router
 from app.rooms.router import router as rooms_router
@@ -148,6 +149,12 @@ async def health_check():
 async def metrics():
     return Response(content=generate_latest(REGISTRY), media_type=CONTENT_TYPE_LATEST)
 
+
+# Serve uploaded files in development mode
+if settings.ENVIRONMENT == "development":
+    os.makedirs("uploads/rooms", exist_ok=True)
+    os.makedirs("uploads/avatars", exist_ok=True)
+    app.mount("/static/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Include all Routers
 app.include_router(auth_router, prefix=settings.API_V1_STR)

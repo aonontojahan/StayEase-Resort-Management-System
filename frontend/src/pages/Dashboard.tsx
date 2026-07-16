@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react"
 import { useAuth } from "@/store/AuthContext"
-import { api } from "@/services/api"
+import { apiGet } from "@/services/api"
 import { OccupancyReport, BookingsSummary, RevenueReport } from "@/types/api"
 import { 
   Home, BookOpen, BedDouble, Sparkles, CreditCard, FileText, Menu, X,
@@ -32,6 +32,12 @@ export const Dashboard: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<string>("Dashboard")
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  useEffect(() => {
+    const handler = (e: CustomEvent<string>) => setActiveTab(e.detail)
+    window.addEventListener("navigate-tab", handler as EventListener)
+    return () => window.removeEventListener("navigate-tab", handler as EventListener)
+  }, [])
   const [editProfileOpen, setEditProfileOpen] = useState(false)
   const [securityOpen, setSecurityOpen] = useState(false)
 
@@ -39,25 +45,22 @@ export const Dashboard: React.FC = () => {
   const [occupancy, setOccupancy] = useState<OccupancyReport | null>(null)
   const [bookingsSummary, setBookingsSummary] = useState<BookingsSummary | null>(null)
   const [revenueReport, setRevenueReport] = useState<RevenueReport[]>([])
-  const [dashboardError, setDashboardError] = useState<string | null>(null)
   const [loadingDashboard, setLoadingDashboard] = useState(false)
 
   const fetchDashboardData = async () => {
     if (!user || !["Resort Owner", "Manager", "Accountant"].includes(user.role.name)) return
     setLoadingDashboard(true)
-    setDashboardError(null)
     try {
-      const [occRes, summaryRes, revRes] = await Promise.all([
-        api.get<OccupancyReport>("/reports/occupancy"),
-        api.get<BookingsSummary>("/reports/bookings-summary"),
-        api.get<RevenueReport[]>("/reports/revenue"),
+      const [occRes, summaryRes, revRes] = await Promise.allSettled([
+        apiGet<OccupancyReport>("/reports/occupancy"),
+        apiGet<BookingsSummary>("/reports/bookings-summary"),
+        apiGet<RevenueReport[]>("/reports/revenue"),
       ])
-      setOccupancy(occRes.data)
-      setBookingsSummary(summaryRes.data)
-      setRevenueReport(revRes.data)
-    } catch (err: any) {
-      const msg = err.response?.data?.detail || err.message || "Failed to load dashboard data"
-      setDashboardError(msg)
+      if (occRes.status === "fulfilled") setOccupancy(occRes.value.data)
+      if (summaryRes.status === "fulfilled") setBookingsSummary(summaryRes.value.data)
+      if (revRes.status === "fulfilled") setRevenueReport(revRes.value.data)
+    } catch {
+      // silently ignore — dashboard shows fallback zeros
     } finally {
       setLoadingDashboard(false)
     }
@@ -205,11 +208,7 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
 
-            {dashboardError && (
-              <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive">
-                Dashboard data error: {dashboardError}. Please refresh.
-              </div>
-            )}
+
             {loadingDashboard ? (
               <StatsGridSkeleton />
             ) : (

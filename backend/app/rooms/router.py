@@ -70,7 +70,7 @@ async def update_room_type(
 @router.delete("/room-types/{room_type_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_room_type(
     room_type_id: uuid.UUID,
-    _: User = require_role(["Resort Owner"]),
+    _: User = require_role(["Resort Owner", "Manager"]),
     db: AsyncSession = Depends(get_db),
 ):
     repo = RoomTypeRepository(db)
@@ -124,9 +124,12 @@ async def list_rooms_with_availability(
     all_rooms = await repo.get_all()
     available_rooms = await repo.get_available(check_in, check_out)
     available_ids = {r.id for r in available_rooms}
+    result = []
     for r in all_rooms:
-        r.is_available = r.id in available_ids
-    return all_rooms
+        room_read = RoomRead.model_validate(r)
+        room_read.is_available = r.id in available_ids
+        result.append(room_read)
+    return result
 
 
 @router.get("/rooms/{room_id}", response_model=RoomRead)

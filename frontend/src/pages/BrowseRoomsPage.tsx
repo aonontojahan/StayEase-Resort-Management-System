@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react"
-import { api } from "@/services/api"
+import React, { useState, useEffect, useRef } from "react"
+import { api, apiGet } from "@/services/api"
 import { Room } from "@/types/api"
 import { useToast } from "@/components/Toast"
 import { Modal } from "@/components/Modal"
@@ -46,6 +46,12 @@ interface CartItem {
   specialRequests?: string
 }
 
+const RESORT_PHONE_NUMBERS: Record<string, string> = {
+  bKash: import.meta.env.VITE_BKASH_NUMBER || "01XXX-XXXXXX",
+  Nagad: import.meta.env.VITE_NAGAD_NUMBER || "01XXX-XXXXXX",
+  Rocket: import.meta.env.VITE_ROCKET_NUMBER || "01XXX-XXXXXX",
+}
+
 export const BrowseRoomsPage: React.FC = () => {
   const { toastSuccess, toastError } = useToast()
   const [rooms, setRooms] = useState<Room[]>([])
@@ -67,15 +73,19 @@ export const BrowseRoomsPage: React.FC = () => {
   const [invoiceId, setInvoiceId] = useState<string | null>(null)
 
   // Payment
-  const [payMethod, setPayMethod] = useState<"bKash" | "Nagad" | "Rocket">("bKash")
+  const [payMethod, setPayMethod] = useState<"Card" | "bKash" | "Nagad" | "Rocket">("bKash")
   const [senderPhone, setSenderPhone] = useState("")
   const [transactionId, setTransactionId] = useState("")
+  const [cardHolderName, setCardHolderName] = useState("")
+  const [cardNumber, setCardNumber] = useState("")
+  const [expiryDate, setExpiryDate] = useState("")
+  const [cvv, setCvv] = useState("")
   const [paymentProcessing, setPaymentProcessing] = useState(false)
 
   const loadInitialRooms = async () => {
     setLoading(true)
     try {
-      const res = await api.get<Room[]>("/rooms")
+      const res = await apiGet<Room[]>("/rooms")
       setRooms(res.data)
     } catch {
       toastError("Failed to load room listings.")
@@ -86,6 +96,18 @@ export const BrowseRoomsPage: React.FC = () => {
 
   useEffect(() => {
     loadInitialRooms()
+  }, [])
+
+  const bookingIdRef = useRef(createdBookingId)
+  bookingIdRef.current = createdBookingId
+
+  useEffect(() => {
+    return () => {
+      const id = bookingIdRef.current
+      if (id) {
+        api.delete(`/bookings/${id}`).catch(() => {})
+      }
+    }
   }, [])
 
   const onSearch = async (e: React.FormEvent) => {
@@ -125,7 +147,7 @@ export const BrowseRoomsPage: React.FC = () => {
       toastError("Please search dates first.")
       return
     }
-    if (!room.is_available) {
+    if (room.is_available === false) {
       toastError("This room is not available.")
       return
     }
@@ -196,31 +218,51 @@ export const BrowseRoomsPage: React.FC = () => {
     e.preventDefault()
     if (!createdBookingId) return
 
-    if (!senderPhone.trim() || senderPhone.trim().length < 10) {
-      toastError("Please enter a valid sender phone number.")
-      return
-    }
-    if (!transactionId.trim()) {
-      toastError("Please enter the transaction ID.")
-      return
+    if (payMethod === "Card") {
+      const cardClean = cardNumber.replace(/\s/g, "")
+      if (!cardHolderName.trim()) { toastError("Please enter the cardholder name."); return }
+      if (cardClean.length !== 16) { toastError("Please enter a valid 16-digit card number."); return }
+      if (!expiryDate.trim() || !/^\d{2}\/\d{2}$/.test(expiryDate)) { toastError("Please enter a valid expiry date (MM/YY)."); return }
+      if (!cvv.trim() || !/^\d{3,4}$/.test(cvv)) { toastError("Please enter a valid CVV."); return }
+    } else {
+      if (!senderPhone.trim() || senderPhone.trim().length < 10) {
+        toastError("Please enter a valid sender phone number.")
+        return
+      }
+      if (!transactionId.trim()) {
+        toastError("Please enter the transaction ID.")
+        return
+      }
     }
 
     setPaymentProcessing(true)
     try {
-      const res = await api.post("/payments/mobile-banking", {
-        booking_id: createdBookingId,
-        amount: cartTotal,
-        payment_method: payMethod,
-        transaction_ref: transactionId.trim(),
-        sender_phone: senderPhone.trim(),
-      })
+      let res
+      if (payMethod === "Card") {
+        res = await api.post("/payments/card", {
+          booking_id: createdBookingId,
+          amount: cartTotal,
+          card_holder_name: cardHolderName.trim(),
+          card_number: cardNumber.replace(/\s/g, ""),
+          expiry_date: expiryDate.trim(),
+          cvv: cvv.trim(),
+        })
+      } else {
+        res = await api.post("/payments/mobile-banking", {
+          booking_id: createdBookingId,
+          amount: cartTotal,
+          payment_method: payMethod,
+          transaction_ref: transactionId.trim(),
+          sender_phone: senderPhone.trim(),
+        })
+      }
       setInvoiceId(res.data?.invoice_id || null)
       toastSuccess("Payment successful! Booking confirmed.")
       setBookingStep("done")
     } catch (err: any) {
       if (createdBookingId) {
         try {
-          await api.patch(`/bookings/${createdBookingId}/status`, { status: "Cancelled" })
+          await api.delete(`/bookings/${createdBookingId}`)
         } catch { /* non-critical */ }
       }
       toastError(err.response?.data?.detail || "Payment failed.")
@@ -238,7 +280,15 @@ export const BrowseRoomsPage: React.FC = () => {
     )
   }
 
+  const cleanupPendingBooking = async () => {
+    if (createdBookingId && bookingStep === "payment") {
+      try { await api.delete(`/bookings/${createdBookingId}`) } catch { /* non-critical */ }
+      setCreatedBookingId(null)
+    }
+  }
+
   const closeCart = () => {
+    cleanupPendingBooking()
     setShowCart(false)
     setBookingStep("cart")
   }
@@ -461,7 +511,7 @@ export const BrowseRoomsPage: React.FC = () => {
         ) : (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {rooms.map((room) => {
-              const avail = searched ? room.is_available : (room.status === "Available" || room.status === "Cleaning")
+              const avail = searched ? (room.is_available ?? ["Available", "Cleaning", "Cleaned"].includes(room.status)) : ["Available", "Cleaning", "Cleaned"].includes(room.status)
               const inCart = cart.some(item => item.room.id === room.id)
 
               return (
@@ -557,7 +607,7 @@ export const BrowseRoomsPage: React.FC = () => {
       <Modal
         isOpen={bookingStep === "payment"}
         title="Complete Your Booking"
-        onClose={() => setBookingStep("cart")}
+        onClose={() => { cleanupPendingBooking(); setBookingStep("cart") }}
       >
         <form onSubmit={onCompletePayment} className="space-y-5">
           {/* Order Summary */}
@@ -578,8 +628,8 @@ export const BrowseRoomsPage: React.FC = () => {
           {/* Payment Method */}
           <div className="space-y-2">
             <label className="text-xs font-bold text-muted-foreground">Payment Method</label>
-            <div className="grid grid-cols-3 gap-2">
-              {(["bKash", "Nagad", "Rocket"] as const).map((m) => (
+            <div className="grid grid-cols-4 gap-2">
+              {(["Card", "bKash", "Nagad", "Rocket"] as const).map((m) => (
                 <div
                   key={m}
                   onClick={() => setPayMethod(m)}
@@ -587,27 +637,46 @@ export const BrowseRoomsPage: React.FC = () => {
                     payMethod === m ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border hover:bg-muted/30"
                   }`}
                 >
-                  <span className="text-xs font-bold">📱 {m}</span>
+                  <span className="text-xs font-bold">
+                    {m === "Card" ? "💳" : "📱"} {m}
+                  </span>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="rounded-lg bg-blue-50 border border-blue-200/50 p-4 text-xs text-blue-800 space-y-2">
-            <p className="font-bold">Pay via {payMethod}</p>
-            <p>Send <strong>TK {cartTotal.toFixed(2)}</strong> to StayEase Resort {payMethod} number below.</p>
-            <div className="bg-white rounded border border-blue-100 p-2.5 text-center">
-              <span className="text-xs text-muted-foreground">Resort {payMethod} Number:</span>
-              <p className="text-base font-bold text-foreground tracking-wider mt-0.5">
-                {import.meta.env[`VITE_${payMethod.toUpperCase()}_NUMBER`] || "01XXX-XXXXXX"}
-              </p>
+          {payMethod === "Card" ? (
+            <div className="space-y-3">
+              <div className="rounded-lg bg-indigo-50 border border-indigo-200/50 p-4 text-xs text-indigo-800 space-y-2">
+                <p className="font-bold">💳 Pay with Card</p>
+                <p>Enter your card details below to pay <strong>TK {cartTotal.toFixed(2)}</strong>.</p>
+              </div>
+              <input type="text" value={cardHolderName} onChange={e => setCardHolderName(e.target.value)} placeholder="Cardholder Name" className="block w-full rounded-lg border bg-card py-2.5 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" required />
+              <input type="text" value={cardNumber} onChange={e => setCardNumber(e.target.value.replace(/\D/g, "").replace(/(\d{4})/g, "$1 ").trim().slice(0, 19))} placeholder="Card Number (XXXX XXXX XXXX XXXX)" className="block w-full rounded-lg border bg-card py-2.5 px-3 text-sm font-mono focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" required />
+              <div className="grid grid-cols-2 gap-3">
+                <input type="text" value={expiryDate} onChange={e => { const v = e.target.value.replace(/\D/g, "").slice(0, 4); setExpiryDate(v.length > 2 ? v.slice(0, 2) + "/" + v.slice(2) : v) }} placeholder="MM/YY" className="block w-full rounded-lg border bg-card py-2.5 px-3 text-sm font-mono focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" required />
+                <input type="text" value={cvv} onChange={e => setCvv(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="CVV" className="block w-full rounded-lg border bg-card py-2.5 px-3 text-sm font-mono focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" required />
+              </div>
             </div>
-          </div>
-          <input type="tel" value={senderPhone} onChange={e => setSenderPhone(e.target.value)} placeholder="Your {payMethod} number (sender)" className="block w-full rounded-lg border bg-card py-2.5 px-3 text-sm font-mono focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" required />
-          <input type="text" value={transactionId} onChange={e => setTransactionId(e.target.value)} placeholder="Transaction ID (TrxID)" className="block w-full rounded-lg border bg-card py-2.5 px-3 text-sm font-mono focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" required />
+          ) : (
+            <>
+              <div className="rounded-lg bg-blue-50 border border-blue-200/50 p-4 text-xs text-blue-800 space-y-2">
+                <p className="font-bold">Pay via {payMethod}</p>
+                <p>Send <strong>TK {cartTotal.toFixed(2)}</strong> to StayEase Resort {payMethod} number below.</p>
+                <div className="bg-white rounded border border-blue-100 p-2.5 text-center">
+                  <span className="text-xs text-gray-500">Resort {payMethod} Number:</span>
+                  <p className="text-base font-bold text-gray-900 tracking-wider mt-0.5">
+                    {RESORT_PHONE_NUMBERS[payMethod]}
+                  </p>
+                </div>
+              </div>
+              <input type="tel" value={senderPhone} onChange={e => setSenderPhone(e.target.value)} placeholder="Your {payMethod} number (sender)" className="block w-full rounded-lg border bg-card py-2.5 px-3 text-sm font-mono focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" required />
+              <input type="text" value={transactionId} onChange={e => setTransactionId(e.target.value)} placeholder="Transaction ID (TrxID)" className="block w-full rounded-lg border bg-card py-2.5 px-3 text-sm font-mono focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" required />
+            </>
+          )}
 
           <div className="flex justify-end gap-3 pt-4 border-t">
-            <button type="button" onClick={() => { setBookingStep("cart") }} disabled={paymentProcessing} className="rounded-lg border px-4 py-2.5 text-sm font-medium hover:bg-secondary transition-colors disabled:opacity-50">Back</button>
+            <button type="button" onClick={() => { cleanupPendingBooking(); setBookingStep("cart") }} disabled={paymentProcessing} className="rounded-lg border px-4 py-2.5 text-sm font-medium hover:bg-secondary transition-colors disabled:opacity-50">Back</button>
             <button type="submit" disabled={paymentProcessing} className="flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-bold text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 shadow-sm">
               {paymentProcessing ? <><Loader2 className="h-4 w-4 animate-spin" /> Processing...</> : <><Lock className="h-4 w-4" /> Pay TK {cartTotal.toFixed(2)}</>}
             </button>

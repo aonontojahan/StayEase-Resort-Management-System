@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react"
-import { api } from "@/services/api"
+import { api, apiGet } from "@/services/api"
 import { Booking } from "@/types/api"
 import { useToast } from "@/components/Toast"
 import { ConfirmModal } from "@/components/Modal"
@@ -27,8 +27,8 @@ export const MyBookingsPage: React.FC = () => {
   const fetchBookings = async () => {
     setLoading(true)
     try {
-      const res = await api.get<Booking[]>("/bookings/my")
-      setBookings(res.data)
+      const res = await apiGet<Booking[]>("/bookings/my")
+      setBookings(res.data.filter(b => b.status !== "Pending"))
     } catch {
       toastError("Failed to load your bookings.")
     } finally {
@@ -44,7 +44,14 @@ export const MyBookingsPage: React.FC = () => {
     if (!cancelBooking) return
     try {
       await api.patch(`/bookings/${cancelBooking.id}/status`, { status: "Cancelled" })
-      toastSuccess("Booking cancelled. 30% refund has been processed.")
+      const paid = cancelBooking.paid_amount
+      const fee = Math.min(cancelBooking.total_amount * 0.30, paid)
+      const refund = paid - fee
+      if (refund > 0) {
+        toastSuccess(`Booking cancelled. 30% fee (TK ${fee.toFixed(2)}) retained. TK ${refund.toFixed(2)} refunded.`)
+      } else {
+        toastSuccess("Booking cancelled. No payment was processed.")
+      }
       setCancelBooking(null)
       fetchBookings()
     } catch (err: any) {
@@ -67,7 +74,7 @@ export const MyBookingsPage: React.FC = () => {
   const getRemaining = (b: Booking) => b.total_amount - b.paid_amount
 
   return (
-    <div className="space-y-8 max-w-5xl">
+    <div className="space-y-8 max-w-7xl">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between border-b pb-4">
         <div>
           <h2 className="text-3xl font-serif tracking-wide flex items-center gap-2">
@@ -83,10 +90,20 @@ export const MyBookingsPage: React.FC = () => {
       {loading ? (
         <TableSkeleton rows={4} cols={1} />
       ) : bookings.length === 0 ? (
-        <div className="rounded-xl border bg-card p-12 text-center text-muted-foreground shadow-sm">
-          <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-30" />
-          <h3 className="text-lg font-bold text-foreground">No bookings found</h3>
-          <p className="mt-1">Browse rooms and book your stay.</p>
+        <div className="flex flex-col items-center justify-center py-24 px-6 rounded-xl border-2 border-dashed bg-card/50 shadow-sm">
+          <div className="rounded-full bg-primary/10 p-5 mb-5">
+            <BookOpen className="h-10 w-10 text-primary" />
+          </div>
+          <h3 className="text-xl font-bold text-foreground">No bookings found</h3>
+          <p className="text-muted-foreground mt-1.5 mb-6 text-center max-w-sm">You haven't made any reservations yet. Browse our rooms and book your perfect stay.</p>
+          <a
+            href="/browse-rooms"
+            onClick={(e) => { e.preventDefault(); window.dispatchEvent(new CustomEvent("navigate-tab", { detail: "Browse Rooms" })) }}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-md hover:bg-primary/90 transition-all hover:shadow-lg active:scale-[0.98]"
+          >
+            <BookOpen className="h-4 w-4" />
+            Browse Rooms
+          </a>
         </div>
       ) : (
         <div className="grid gap-6 sm:grid-cols-2">
@@ -176,16 +193,44 @@ export const MyBookingsPage: React.FC = () => {
       <ConfirmModal
         isOpen={!!cancelBooking}
         title="Cancel Reservation"
-        message={
-          cancelBooking
-            ? `Cancel this booking? Refund policy: 30% of total paid amount will be refunded.`
-            : ""
-        }
-        confirmLabel="Yes, Cancel"
+        message=""
         onConfirm={onCancelBooking}
         onCancel={() => setCancelBooking(null)}
         danger
-      />
+      >
+        {cancelBooking && cancelBooking.paid_amount > 0 ? (
+          <div className="space-y-4">
+            <div className="rounded-lg bg-amber-50 border border-amber-200 p-4 text-sm space-y-3">
+              <div className="flex items-center gap-2 font-semibold text-amber-800">
+                <RotateCcw className="h-4 w-4" />
+                Cancellation Policy
+              </div>
+              <p className="text-amber-700">If you cancel this booking:</p>
+              <div className="bg-white rounded border border-amber-100 divide-y text-xs">
+                <div className="flex justify-between p-2.5">
+                  <span className="text-muted-foreground">Total Paid</span>
+                  <span className="font-bold">TK {cancelBooking.paid_amount.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between p-2.5">
+                  <span className="text-red-600">30% Cancellation Fee (deducted)</span>
+                  <span className="font-bold text-red-600">- TK {(cancelBooking.total_amount * 0.30).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between p-2.5 bg-emerald-50">
+                  <span className="text-emerald-700 font-semibold">You will receive (70% refund)</span>
+                  <span className="font-bold text-emerald-700">TK {(cancelBooking.paid_amount - Math.min(cancelBooking.total_amount * 0.30, cancelBooking.paid_amount)).toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground text-center">The refund will be processed to your original payment method.</p>
+          </div>
+        ) : cancelBooking ? (
+          <div className="space-y-4">
+            <div className="rounded-lg bg-muted/30 border p-4 text-sm space-y-2">
+              <p className="text-muted-foreground">No payment has been made for this booking. The reservation will be cancelled with no charges.</p>
+            </div>
+          </div>
+        ) : null}
+      </ConfirmModal>
 
       <ConfirmModal
         isOpen={!!deleteBooking}

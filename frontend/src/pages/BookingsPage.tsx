@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react"
-import { api } from "@/services/api"
+import { api, apiGet } from "@/services/api"
 import { Booking, Room } from "@/types/api"
 
 interface GuestSearchResult {
@@ -62,13 +62,13 @@ export const BookingsPage: React.FC = () => {
   const [itemsPerPage] = useState(10)
   const [totalItems, setTotalItems] = useState(0)
   const totalPages = Math.ceil(totalItems / itemsPerPage)
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   const fetchBookings = async (currentPage = page) => {
     setLoading(true)
     const skip = (currentPage - 1) * itemsPerPage
     try {
-      const res = await api.get<Booking[]>("/bookings/", { params: { skip, limit: itemsPerPage } })
+      const res = await apiGet<Booking[]>("/bookings/", { params: { skip, limit: itemsPerPage } })
       setBookings(res.data)
       setTotalItems(parseInt(res.headers["x-total-count"] || "0", 10))
     } catch {
@@ -293,7 +293,7 @@ export const BookingsPage: React.FC = () => {
           <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             value={search}
-            onChange={(e) => { setSearch(e.target.value); clearTimeout(searchTimerRef.current); searchTimerRef.current = setTimeout(() => { setPage(1); fetchBookings(1) }, 400) }}
+            onChange={(e) => { setSearch(e.target.value); if (searchTimerRef.current) clearTimeout(searchTimerRef.current); searchTimerRef.current = setTimeout(() => { setPage(1); fetchBookings(1) }, 400) }}
             placeholder="Search guest name, email, room..."
             className="w-full rounded-lg border bg-card py-2 pl-9 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
           />

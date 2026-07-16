@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useRef, useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { api } from "@/services/api"
+import { api, apiGet } from "@/services/api"
 import { Room, RoomType, RoomCreate, RoomUpdate, RoomTypeCreate } from "@/types/api"
 import { Pagination } from "@/components/Pagination"
 import { TableSkeleton } from "@/components/Skeleton"
@@ -10,7 +10,7 @@ import { useToast } from "@/components/Toast"
 import { Modal, ConfirmModal } from "@/components/Modal"
 import {
   BedDouble, Plus, Pencil, Trash2, Loader2, RefreshCw,
-  Search, Filter, Tag, ChevronDown, Sparkles,
+  Search, Filter, Tag, ChevronDown, Sparkles, X, Upload,
 } from "lucide-react"
 
 const roomCreateSchema = z.object({
@@ -33,7 +33,6 @@ const roomTypeSchema = z.object({
   description: z.string().optional(),
   base_price_per_night: z.coerce.number().min(1, "Price must be > 0"),
   max_occupancy: z.coerce.number().min(1, "Occupancy must be ≥ 1"),
-  image_urls: z.string().optional(),
 })
 
 const STATUS_COLORS: Record<string, string> = {
@@ -61,6 +60,12 @@ export const RoomsPage: React.FC = () => {
   const [editRoom, setEditRoom] = useState<Room | null>(null)
   const [deleteRoom, setDeleteRoom] = useState<Room | null>(null)
   const [createTypeOpen, setCreateTypeOpen] = useState(false)
+  const [deleteRoomType, setDeleteRoomType] = useState<RoomType | null>(null)
+
+  // Image upload state
+  const [uploadedImages, setUploadedImages] = useState<string[]>([])
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Forms
   const createForm = useForm<RoomCreate>({ resolver: zodResolver(roomCreateSchema) })
@@ -72,8 +77,8 @@ export const RoomsPage: React.FC = () => {
     const skip = (currentPage - 1) * itemsPerPage
     try {
       const [roomsRes, typesRes] = await Promise.all([
-        api.get<Room[]>("/rooms", { params: { skip, limit: itemsPerPage } }),
-        api.get<RoomType[]>("/room-types"),
+        apiGet<Room[]>("/rooms", { params: { skip, limit: itemsPerPage } }),
+        apiGet<RoomType[]>("/room-types"),
       ])
       setRooms(roomsRes.data)
       setTotalItems(parseInt(roomsRes.headers["x-total-count"] || "0", 10))
@@ -156,6 +161,18 @@ export const RoomsPage: React.FC = () => {
     }
   }
 
+  const onDeleteRoomType = async () => {
+    if (!deleteRoomType) return
+    try {
+      await api.delete(`/room-types/${deleteRoomType.id}`)
+      toastSuccess(`Room type "${deleteRoomType.name}" deleted.`)
+      setDeleteRoomType(null)
+      fetchData()
+    } catch (err: any) {
+      toastError(err.response?.data?.detail || "Failed to delete room type.")
+    }
+  }
+
   const markAvailable = async (room: Room) => {
     try {
       await api.patch(`/rooms/${room.id}/mark-available`)
@@ -166,18 +183,94 @@ export const RoomsPage: React.FC = () => {
     }
   }
 
+  // Compress image to reasonable size using createImageBitmap for reliability
+  const compressImage = async (file: File): Promise<Blob> => {
+    const bitmap = await createImageBitmap(file)
+    const MAX_DIM = 1200
+    let { width, height } = bitmap
+    if (width > MAX_DIM || height > MAX_DIM) {
+      if (width > height) { height = Math.round(height * MAX_DIM / width); width = MAX_DIM }
+      else { width = Math.round(width * MAX_DIM / height); height = MAX_DIM }
+    }
+    const canvas = document.createElement("canvas")
+    canvas.width = width
+    canvas.height = height
+    const ctx = canvas.getContext("2d")!
+    ctx.drawImage(bitmap, 0, 0, width, height)
+    bitmap.close()
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(blob => {
+        if (blob) resolve(blob)
+        else reject(new Error("Canvas export failed"))
+      }, "image/jpeg", 0.75)
+    })
+  }
+
+  // Image upload handler
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    const baseUrl = import.meta.env.VITE_API_URL?.replace("/api/v1", "") || "http://localhost:8000"
+    const token = localStorage.getItem("accessToken")
+
+    setUploading(true)
+    try {
+      for (const file of Array.from(files)) {
+        let uploadFile: Blob | File
+        let uploadName: string
+        if (file.size > 5 * 1024 * 1024) {
+          try {
+            uploadFile = await compressImage(file)
+            uploadName = file.name.replace(/\.[^.]+$/, ".jpg")
+          } catch {
+            toastError(`${file.name} is too large. Max 5MB.`)
+            continue
+          }
+        } else {
+          uploadFile = file
+          uploadName = file.name
+        }
+        const formData = new FormData()
+        formData.append("file", uploadFile, uploadName)
+        const res = await fetch(`${baseUrl}/api/v1/uploads/room-image`, {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: formData,
+        })
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}))
+          throw { response: { data: body } }
+        }
+        const data = await res.json()
+        const url = data.url.startsWith("http") ? data.url : `${baseUrl}${data.url}`
+        setUploadedImages(prev => [...prev, url])
+      }
+    } catch (err: any) {
+      const detail = err.response?.data?.detail
+      const msg = Array.isArray(detail) ? detail.map((d: any) => d.msg).join("; ") : detail || "Failed to upload image."
+      toastError(msg)
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ""
+    }
+  }
+
+  const removeImage = (url: string) => {
+    setUploadedImages(prev => prev.filter(u => u !== url))
+  }
+
   // Create Room Type
   const onCreateType = async (data: any) => {
     try {
       const payload: RoomTypeCreate = {
         ...data,
-        image_urls: data.image_urls
-          ? data.image_urls.split(",").map((u: string) => u.trim()).filter(Boolean)
-          : [],
+        image_urls: uploadedImages,
       }
       await api.post("/room-types", payload)
       toastSuccess("Room type created!")
       setCreateTypeOpen(false)
+      setUploadedImages([])
       typeForm.reset()
       fetchData()
     } catch (err: any) {
@@ -224,6 +317,41 @@ export const RoomsPage: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {/* Room Types List */}
+      {roomTypes.length > 0 && (
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b bg-muted/20">
+            <h3 className="text-sm font-semibold flex items-center gap-2"><Tag className="h-4 w-4" /> Room Types</h3>
+          </div>
+          <div className="divide-y">
+            {roomTypes.map((rt) => (
+              <div key={rt.id} className="flex items-center justify-between px-5 py-2.5 hover:bg-muted/10">
+                <div className="flex items-center gap-3 min-w-0">
+                  {rt.image_urls && rt.image_urls.length > 0 ? (
+                    <img src={rt.image_urls[0]} alt="" className="h-10 w-14 rounded object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="h-10 w-14 rounded bg-muted flex items-center justify-center flex-shrink-0">
+                      <BedDouble className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{rt.name}</p>
+                    <p className="text-xs text-muted-foreground">TK {rt.base_price_per_night.toFixed(2)}/night · Max {rt.max_occupancy} guests</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setDeleteRoomType(rt)}
+                  className="rounded-lg p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  title={`Delete ${rt.name}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Search & Filter */}
       <div className="flex gap-3 flex-col sm:flex-row">
@@ -425,7 +553,7 @@ export const RoomsPage: React.FC = () => {
       </Modal>
 
       {/* Create Room Type Modal */}
-      <Modal isOpen={createTypeOpen} title="Add Room Type" onClose={() => { setCreateTypeOpen(false); typeForm.reset() }}>
+      <Modal isOpen={createTypeOpen} title="Add Room Type" onClose={() => { setCreateTypeOpen(false); typeForm.reset(); setUploadedImages([]) }}>
         <form onSubmit={typeForm.handleSubmit(onCreateType)} className="space-y-4">
           <div className="space-y-1">
             <label className="text-xs font-semibold text-muted-foreground">Type Name</label>
@@ -449,8 +577,47 @@ export const RoomsPage: React.FC = () => {
             <textarea {...typeForm.register("description")} rows={2} className="block w-full rounded-lg border bg-card py-2 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none" />
           </div>
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-muted-foreground">Image URLs (comma-separated, optional)</label>
-            <input {...typeForm.register("image_urls")} className="block w-full rounded-lg border bg-card py-2 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" placeholder="https://images.unsplash.com/photo-..." />
+            <label className="text-xs font-semibold text-muted-foreground">Room Images</label>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="flex items-center gap-2 rounded-lg border bg-card px-4 py-2 text-sm font-medium hover:bg-secondary transition-colors disabled:opacity-50"
+              >
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                {uploading ? "Uploading..." : "Upload Images"}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                multiple
+                className="hidden"
+                onChange={handleImageUpload}
+              />
+              <span className="text-xs text-muted-foreground">JPEG, PNG, WebP, GIF (max 5MB each)</span>
+            </div>
+            {uploadedImages.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-3">
+                {uploadedImages.map((url, idx) => (
+                  <div key={idx} className="relative group">
+                    <img
+                      src={url}
+                      alt={`Room ${idx + 1}`}
+                      className="h-20 w-28 rounded-lg border object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(url)}
+                      className="absolute -top-2 -right-2 rounded-full bg-destructive text-destructive-foreground p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => { setCreateTypeOpen(false); typeForm.reset() }} className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-secondary transition-colors">Cancel</button>
@@ -470,6 +637,16 @@ export const RoomsPage: React.FC = () => {
         confirmLabel="Delete"
         onConfirm={onDeleteRoom}
         onCancel={() => setDeleteRoom(null)}
+        danger
+      />
+      {/* Delete Room Type Confirm */}
+      <ConfirmModal
+        isOpen={!!deleteRoomType}
+        title="Delete Room Type"
+        message={`Are you sure you want to delete "${deleteRoomType?.name}"? This will fail if rooms of this type still exist.`}
+        confirmLabel="Delete"
+        onConfirm={onDeleteRoomType}
+        onCancel={() => setDeleteRoomType(null)}
         danger
       />
     </div>

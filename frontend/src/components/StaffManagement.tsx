@@ -3,7 +3,7 @@ import { useAuth } from "@/store/AuthContext"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { api } from "@/services/api"
+import { api, apiGet } from "@/services/api"
 import { TableSkeleton } from "@/components/Skeleton"
 import { Loader2, Plus, Trash2, Users } from "lucide-react"
 
@@ -11,7 +11,13 @@ const userSchema = z.object({
   email: z.string().email("Invalid email"),
   full_name: z.string().min(2, "Name too short"),
   phone_number: z.string().optional(),
-  password: z.string().min(6, "Minimum 6 characters"),
+  password: z
+    .string()
+    .min(8, "Minimum 8 characters")
+    .regex(/[a-z]/, "Must include a lowercase letter")
+    .regex(/[A-Z]/, "Must include an uppercase letter")
+    .regex(/[0-9]/, "Must include a digit")
+    .regex(/[!@#$%^&*()_\-+=<>?/{}~|]/, "Must include a special character"),
   role_name: z.string().min(1, "Role is required"),
 })
 
@@ -40,7 +46,7 @@ export const StaffManagement: React.FC = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true)
-      const res = await api.get("/auth/users")
+      const res = await apiGet("/auth/users")
       setUsers(res.data)
     } catch (err: any) {
       console.error(err)
@@ -62,7 +68,8 @@ export const StaffManagement: React.FC = () => {
       reset()
       fetchUsers()
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.detail || "Failed to create user.")
+      const detail = err.response?.data?.detail
+      setErrorMsg(Array.isArray(detail) ? detail.map((d: any) => d.msg).join("; ") : detail || "Failed to create user.")
     }
   }
 
@@ -85,7 +92,8 @@ export const StaffManagement: React.FC = () => {
       setDeleteTarget(null)
       fetchUsers()
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.detail || "Failed to delete user.")
+      const detail = err.response?.data?.detail
+      setErrorMsg(Array.isArray(detail) ? detail.map((d: any) => d.msg).join("; ") : detail || "Failed to delete user.")
     } finally {
       setDeleting(false)
     }

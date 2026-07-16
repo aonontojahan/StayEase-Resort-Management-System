@@ -90,7 +90,7 @@ class RoomRepository:
             .options(selectinload(Room.room_type))
             .where(
                 Room.id.notin_(booked_subq),
-                Room.status.in_(["Available", "Cleaning"]),
+                Room.status.in_(["Available", "Cleaning", "Cleaned"]),
             )
             .order_by(Room.room_number)
         )

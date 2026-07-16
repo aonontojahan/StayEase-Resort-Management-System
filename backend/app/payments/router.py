@@ -20,6 +20,7 @@ from app.invoices.schemas import InvoiceCreate, InvoiceItemCreate
 from app.invoices.repository import InvoiceRepository
 from app.payments.repository import PaymentRepository
 from app.payments.schemas import (
+    CardPayment,
     MobileBankingPayment,
     PaymentCreate,
     PaymentRead,
@@ -222,6 +223,105 @@ async def pay_via_mobile_banking(
                 quantity=1,
                 unit_price=capped,
                 amount=capped,
+            )
+        ],
+    )
+    invoice_repo = InvoiceRepository(db)
+    invoice = await invoice_repo.create(inv_data, booking.guest_id)
+
+    new_paid = float(booking.paid_amount)
+    new_remaining = booking_total - new_paid
+
+    email_html = get_booking_confirmation_html(
+        guest_name=booking.guest.full_name,
+        room_name=", ".join([br.room.room_type.name for br in booking.booking_rooms]),
+        room_number=", ".join([br.room.room_number for br in booking.booking_rooms]),
+        check_in=str(booking.booking_rooms[0].check_in_date)
+        if booking.booking_rooms
+        else "",
+        check_out=str(booking.booking_rooms[0].check_out_date)
+        if booking.booking_rooms
+        else "",
+        nights=max(
+            (br.check_out_date - br.check_in_date).days for br in booking.booking_rooms
+        )
+        if booking.booking_rooms
+        else 1,
+        total_amount=booking_total,
+        amount_paid=new_paid,
+        remaining_balance=new_remaining,
+        payment_status="Fully Settled",
+        booking_id=str(booking.id),
+    )
+    await asyncio.to_thread(
+        send_html_email,
+        to_email=booking.guest.email,
+        subject=f"StayEase Resort - Booking Confirmation #{booking.id}",
+        html_content=email_html,
+        text_content=f"Your booking at StayEase Resort has been confirmed! Booking ID: {booking.id}. Total: TK {booking_total:.2f}. Paid: TK {new_paid:.2f}.",
+    )
+
+    return {
+        "payment": PaymentRead.model_validate(payment).model_dump(),
+        "invoice_id": str(invoice.id),
+    }
+
+
+@router.post("/card")
+async def pay_via_card(
+    body: CardPayment,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    booking_repo = BookingRepository(db)
+    booking = await booking_repo.get_by_id(body.booking_id)
+    if not booking:
+        raise NotFoundException("Booking not found.")
+
+    if current_user.role.name == "Guest" and booking.guest_id != current_user.id:
+        raise BadRequestException("You can only pay for your own bookings.")
+
+    remaining = float(booking.total_amount) - float(booking.paid_amount)
+    if remaining <= 0:
+        raise BadRequestException("Booking is already fully paid.")
+
+    if body.amount > remaining + 0.01:
+        raise BadRequestException(
+            f"Amount ({body.amount}) exceeds remaining balance ({remaining:.2f}). "
+            f"Please enter an amount up to TK {remaining:.2f}."
+        )
+
+    payment_data = PaymentCreate(
+        booking_id=booking.id,
+        amount=body.amount,
+        payment_method="Card",
+        transaction_ref=f"CARD-{body.card_number[-4:]}-{uuid.uuid4().hex[:8].upper()}",
+        notes=f"Card payment by {body.card_holder_name} (****{body.card_number[-4:]})",
+    )
+    payment_repo = PaymentRepository(db)
+    payment = await payment_repo.create(payment_data, current_user.id)
+
+    if booking.status == BookingStatus.pending:
+        await booking_repo.update_status(booking, BookingStatus.confirmed)
+
+    await db.refresh(booking, ["payments"])
+
+    booking_total = float(booking.total_amount)
+
+    desc = "Full Payment via Card"
+    inv_data = InvoiceCreate(
+        booking_id=booking.id,
+        due_date=booking.booking_rooms[0].check_in_date
+        if booking.booking_rooms
+        else booking.created_at.date(),
+        subtotal=body.amount,
+        tax_rate=0,
+        items=[
+            InvoiceItemCreate(
+                description=desc,
+                quantity=1,
+                unit_price=body.amount,
+                amount=body.amount,
             )
         ],
     )

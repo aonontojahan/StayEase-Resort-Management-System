@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react"
-import { api } from "@/services/api"
+import { api, apiGet } from "@/services/api"
 import { Payment, RevenueReport, Refund, RefundSummary } from "@/types/api"
 import { useToast } from "@/components/Toast"
 import { Modal } from "@/components/Modal"
@@ -126,12 +126,12 @@ export const AccountantPage: React.FC = () => {
     setLoading(true)
     try {
       const [paymentsRes, bookingsRes, summaryRes, revRes, refundRes, refundSumRes] = await Promise.all([
-        api.get<Payment[]>("/payments/"),
-        api.get<any[]>("/bookings/"),
-        api.get<RevenueSummary>("/payments/summary"),
-        api.get<RevenueReport[]>("/reports/revenue"),
-        api.get<Refund[]>("/refunds/"),
-        api.get<RefundSummary>("/refunds/summary"),
+        apiGet<Payment[]>("/payments/"),
+        apiGet<any[]>("/bookings/"),
+        apiGet<RevenueSummary>("/payments/summary"),
+        apiGet<RevenueReport[]>("/reports/revenue"),
+        apiGet<Refund[]>("/refunds/"),
+        apiGet<RefundSummary>("/refunds/summary"),
       ])
       setPayments(paymentsRes.data)
       setBookings(bookingsRes.data)

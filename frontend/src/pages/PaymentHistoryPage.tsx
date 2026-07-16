@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react"
-import { api } from "@/services/api"
+import { apiGet } from "@/services/api"
 import { Payment } from "@/types/api"
 import { useToast } from "@/components/Toast"
 import { CreditCard, Loader2, RefreshCw, CheckCircle, Clock } from "lucide-react"
@@ -18,7 +18,7 @@ export const PaymentHistoryPage: React.FC = () => {
   const fetchPayments = async () => {
     setLoading(true)
     try {
-      const res = await api.get<Payment[]>("/payments/my")
+      const res = await apiGet<Payment[]>("/payments/my")
       setPayments(res.data)
     } catch {
       toastError("Failed to load your payment history.")
@@ -32,7 +32,7 @@ export const PaymentHistoryPage: React.FC = () => {
   }, [])
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-7xl">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
@@ -51,10 +51,20 @@ export const PaymentHistoryPage: React.FC = () => {
             <Loader2 className="h-7 w-7 animate-spin mx-auto text-muted-foreground" />
           </div>
         ) : payments.length === 0 ? (
-          <div className="p-12 text-center text-muted-foreground">
-            <CreditCard className="h-10 w-10 mx-auto mb-3 opacity-30" />
-            <p className="font-medium text-foreground">No payments found</p>
-            <p className="text-sm mt-1">You haven't made any payments yet.</p>
+          <div className="flex flex-col items-center justify-center py-24 px-6 rounded-xl border-2 border-dashed bg-card/50 shadow-sm">
+            <div className="rounded-full bg-primary/10 p-5 mb-5">
+              <CreditCard className="h-10 w-10 text-primary" />
+            </div>
+            <h3 className="text-xl font-bold text-foreground">No payments found</h3>
+            <p className="text-muted-foreground mt-1.5 mb-6 text-center max-w-sm">You haven't made any payments yet. Payments appear here once you complete a booking.</p>
+            <a
+              href="/browse-rooms"
+              onClick={(e) => { e.preventDefault(); window.dispatchEvent(new CustomEvent("navigate-tab", { detail: "Browse Rooms" })) }}
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-md hover:bg-primary/90 transition-all hover:shadow-lg active:scale-[0.98]"
+            >
+              <CreditCard className="h-4 w-4" />
+              Browse Rooms
+            </a>
           </div>
         ) : (
           <div className="divide-y">

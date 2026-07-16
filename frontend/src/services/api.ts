@@ -17,6 +17,60 @@ export const api = axios.create({
   },
 })
 
+/**
+ * Simple in-memory GET request cache with stale-while-revalidate semantics.
+ * Caches GET responses keyed by URL + params. Serving cached data instantly
+ * on repeated requests while refreshing in the background.
+ */
+interface CacheEntry {
+  data: unknown
+  headers: Record<string, string>
+  fetchedAt: number
+}
+
+const cache = new Map<string, CacheEntry>()
+const CACHE_TTL_MS = 30_000
+
+function cacheKey(url: string, config?: any): string {
+  return `${url}::${JSON.stringify(config?.params || {})}`
+}
+
+export async function apiGet<T = any>(
+  url: string,
+  config?: any,
+  ttl = CACHE_TTL_MS,
+): Promise<{ data: T; headers: Record<string, string> }> {
+  const key = cacheKey(url, config)
+  const cached = cache.get(key)
+  const now = Date.now()
+
+  if (cached && now - cached.fetchedAt < ttl) {
+    return { data: cached.data as T, headers: cached.headers }
+  }
+
+  if (cached) {
+    // Stale — return cached immediately, refresh in background
+    api.get<T>(url, config).then((res) => {
+      cache.set(key, { data: res.data, headers: res.headers as Record<string, string>, fetchedAt: Date.now() })
+    }).catch(() => {})
+    return { data: cached.data as T, headers: cached.headers }
+  }
+
+  const res = await api.get<T>(url, config)
+  cache.set(key, { data: res.data, headers: res.headers as Record<string, string>, fetchedAt: Date.now() })
+  return { data: res.data, headers: res.headers as Record<string, string> }
+}
+
+export function clearCache(pattern?: RegExp) {
+  if (!pattern) {
+    cache.clear()
+    return
+  }
+  for (const key of cache.keys()) {
+    if (pattern.test(key)) cache.delete(key)
+  }
+}
+
 // Attach access token to every outgoing request
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {

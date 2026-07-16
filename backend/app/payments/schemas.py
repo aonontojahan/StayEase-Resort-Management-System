@@ -72,3 +72,13 @@ class MobileBankingPayment(BaseModel):
     payment_method: str
     transaction_ref: str
     sender_phone: str = Field(..., pattern=r"^\+?[0-9]{10,15}$")
+
+
+class CardPayment(BaseModel):
+    booking_id: uuid.UUID
+    amount: float = Field(..., gt=0)
+    payment_method: str = "Card"
+    card_holder_name: str = Field(..., min_length=1, max_length=100)
+    card_number: str = Field(..., pattern=r"^\d{16}$")
+    expiry_date: str = Field(..., pattern=r"^\d{2}/\d{2}$")
+    cvv: str = Field(..., pattern=r"^\d{3,4}$")

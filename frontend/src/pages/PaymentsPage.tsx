@@ -2,13 +2,14 @@ import React, { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { api } from "@/services/api"
-import { Payment, PaymentCreate, Booking, RevenueReport } from "@/types/api"
+import { api, apiGet } from "@/services/api"
+import { Payment, PaymentCreate, Booking, RevenueSummary } from "@/types/api"
 import { useAuth } from "@/store/AuthContext"
 import { useToast } from "@/components/Toast"
 import { Modal } from "@/components/Modal"
 import {
-  CreditCard, Plus, Loader2, RefreshCw, Search, DollarSign, Activity, Undo2
+  CreditCard, Plus, Loader2, RefreshCw, Search, DollarSign, Undo2,
+  TrendingUp, TrendingDown, BarChart3
 } from "lucide-react"
 
 const paymentSchema = z.object({
@@ -24,7 +25,7 @@ export const PaymentsPage: React.FC = () => {
   const { user } = useAuth()
   const [payments, setPayments] = useState<Payment[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
-  const [revenue, setRevenue] = useState<RevenueReport[]>([])
+  const [summary, setSummary] = useState<RevenueSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [createOpen, setCreateOpen] = useState(false)
@@ -41,14 +42,14 @@ export const PaymentsPage: React.FC = () => {
   const fetchData = async () => {
     setLoading(true)
     try {
-      const [paymentsRes, bookingsRes, revRes] = await Promise.all([
-        api.get<Payment[]>("/payments/"),
-        api.get<Booking[]>("/bookings/"),
-        api.get<RevenueReport[]>("/reports/revenue")
+      const [paymentsRes, bookingsRes, summaryRes] = await Promise.all([
+        apiGet<Payment[]>("/payments/"),
+        apiGet<Booking[]>("/bookings/"),
+        apiGet<RevenueSummary>("/payments/summary"),
       ])
       setPayments(paymentsRes.data)
       setBookings(bookingsRes.data)
-      setRevenue(revRes.data)
+      setSummary(summaryRes.data)
     } catch {
       toastError("Failed to load payment data.")
     } finally {
@@ -120,9 +121,6 @@ export const PaymentsPage: React.FC = () => {
     BankTransfer: "bg-purple-100 text-purple-800",
   }
 
-  const totalRevenue = revenue.reduce((sum, r) => sum + r.revenue, 0)
-  const totalCount = revenue.reduce((sum, r) => sum + r.count, 0)
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -145,18 +143,57 @@ export const PaymentsPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="rounded-xl border bg-card p-5 shadow-sm space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-            <DollarSign className="h-4 w-4 text-green-600" /> Total Revenue
-          </p>
-          <h3 className="text-2xl font-bold">TK {totalRevenue.toFixed(2)}</h3>
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="rounded-xl border bg-card p-5 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Net Revenue</p>
+            <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center">
+              <TrendingUp className="h-4 w-4 text-emerald-600" />
+            </div>
+          </div>
+          <h3 className="text-2xl font-bold text-emerald-600">
+            TK {(summary?.net_revenue ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          </h3>
+          <p className="text-[10px] text-muted-foreground">After refunds & fees</p>
         </div>
-        <div className="rounded-xl border bg-card p-5 shadow-sm space-y-2">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-            <Activity className="h-4 w-4 text-blue-600" /> Transactions
-          </p>
-          <h3 className="text-2xl font-bold">{totalCount}</h3>
+
+        <div className="rounded-xl border bg-card p-5 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Gross Collected</p>
+            <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+              <DollarSign className="h-4 w-4 text-blue-600" />
+            </div>
+          </div>
+          <h3 className="text-2xl font-bold text-blue-600">
+            TK {(summary?.completed_payments ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          </h3>
+          <p className="text-[10px] text-muted-foreground">{summary?.total_payments ?? 0} completed payments</p>
+        </div>
+
+        <div className="rounded-xl border bg-card p-5 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total Refunded</p>
+            <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
+              <TrendingDown className="h-4 w-4 text-red-500" />
+            </div>
+          </div>
+          <h3 className="text-2xl font-bold text-red-500">
+            TK {(summary?.refunded_payments ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          </h3>
+          <p className="text-[10px] text-muted-foreground">Original amounts refunded</p>
+        </div>
+
+        <div className="rounded-xl border bg-card p-5 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Cancellation Fees</p>
+            <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center">
+              <BarChart3 className="h-4 w-4 text-purple-600" />
+            </div>
+          </div>
+          <h3 className="text-2xl font-bold text-purple-600">
+            TK {(summary?.cancellation_fees ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          </h3>
+          <p className="text-[10px] text-muted-foreground">30% fee retained on cancellations</p>
         </div>
       </div>
 

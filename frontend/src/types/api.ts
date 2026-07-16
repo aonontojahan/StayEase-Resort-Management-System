@@ -258,6 +258,16 @@ export interface Refund {
   completed_at: string | null
 }
 
+export interface RevenueSummary {
+  total_revenue: number
+  net_revenue: number
+  total_payments: number
+  completed_payments: number
+  refunded_payments: number
+  cancellation_fees: number
+  actual_refunded: number
+}
+
 export interface RefundSummary {
   pending_count: number
   total_refunded: number

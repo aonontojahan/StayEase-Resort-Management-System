@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react"
-import { api } from "@/services/api"
+import { api, apiGet } from "@/services/api"
 import { HousekeepingTask } from "@/types/api"
 import { useToast } from "@/components/Toast"
 import { useWebSocket } from "@/hooks/useWebSocket"
@@ -35,7 +35,7 @@ export const HousekeepingTasksPage: React.FC = () => {
   const fetchTasks = async () => {
     setLoading(true)
     try {
-      const res = await api.get<HousekeepingTask[]>("/housekeeping/")
+      const res = await apiGet<HousekeepingTask[]>("/housekeeping/")
       setTasks(res.data)
     } catch {
       toastError("Failed to load your tasks.")

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { api } from "@/services/api"
+import { api, apiGet } from "@/services/api"
 import { HousekeepingTask, TaskCreate, Room } from "@/types/api"
 import { User } from "@/types/auth"
 import { TableSkeleton } from "@/components/Skeleton"
@@ -68,9 +68,9 @@ export const HousekeepingPage: React.FC = () => {
     setLoading(true)
     try {
       const [tasksRes, roomsRes, usersRes] = await Promise.all([
-        api.get<HousekeepingTask[]>("/housekeeping/"),
-        api.get<Room[]>("/rooms"),
-        api.get<User[]>("/auth/users"),
+        apiGet<HousekeepingTask[]>("/housekeeping/"),
+        apiGet<Room[]>("/rooms"),
+        apiGet<User[]>("/auth/users"),
       ])
       setTasks(tasksRes.data)
       setRooms(roomsRes.data)
