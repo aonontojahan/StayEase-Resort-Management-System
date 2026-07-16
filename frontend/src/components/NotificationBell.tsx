@@ -113,7 +113,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ className = 
   // Track IDs that have been seen so only *new* ones are marked unread
   const seenIdsRef = useRef<Set<string>>(new Set())
 
-  const { connected, onMessage } = useWebSocket("global")
+  const { onMessage } = useWebSocket("global")
   const unreadCount = notifications.filter((n) => !n.read).length
   const totalCount = notifications.length
 

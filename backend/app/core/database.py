@@ -4,12 +4,18 @@ from sqlalchemy.orm import DeclarativeBase
 
 from app.core.config import settings
 
-# Create async engine. Use echo=True only in development for query debugging if desired.
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=settings.ENVIRONMENT == "development",
     future=True,
     pool_pre_ping=True,
+    pool_size=5,
+    max_overflow=10,
+    pool_recycle=300,
+    connect_args={
+        "timeout": 30,
+        "command_timeout": 30,
+    },
 )
 
 # Async session factory
@@ -24,6 +30,7 @@ SessionLocal = async_sessionmaker(
 
 class Base(DeclarativeBase):
     """Base class for all SQLAlchemy ORM models."""
+
     pass
 
 

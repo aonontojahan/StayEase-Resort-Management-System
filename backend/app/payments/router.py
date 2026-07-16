@@ -1,10 +1,9 @@
 import asyncio
 import logging
 import uuid
-import stripe
 from typing import List
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +13,6 @@ from app.auth.models import User
 from app.bookings.repository import BookingRepository
 from app.bookings.models import BookingStatus
 from app.core.database import get_db
-from app.core.config import settings
 from app.core.email import send_html_email, get_booking_confirmation_html
 from app.core.exceptions import BadRequestException, NotFoundException
 from app.core.pagination import PaginationParams
@@ -26,8 +24,6 @@ from app.payments.schemas import (
     PaymentCreate,
     PaymentRead,
     RevenueSummary,
-    StripeIntentCreate,
-    StripePaymentConfirm,
 )
 
 
@@ -45,8 +41,10 @@ async def list_payments(
     _: User = require_role(FINANCE_ROLES),
     db: AsyncSession = Depends(get_db),
 ):
+    max_limit = 1000
+    safe_limit = min(pagination.limit, max_limit)
     repo = PaymentRepository(db)
-    items = await repo.get_all(skip=pagination.skip, limit=pagination.limit)
+    items = await repo.get_all(skip=pagination.skip, limit=safe_limit)
     total = await repo.count_all()
     return JSONResponse(
         content=jsonable_encoder([PaymentRead.model_validate(p) for p in items]),
@@ -107,6 +105,17 @@ async def record_payment(
     if not booking:
         raise NotFoundException("Booking not found.")
 
+    if booking.status in (BookingStatus.cancelled, BookingStatus.checked_out):
+        raise BadRequestException(
+            f"Cannot record payment for a {booking.status.value} booking."
+        )
+
+    remaining = float(booking.total_amount) - float(booking.paid_amount)
+    if data.amount > remaining + 0.01:
+        raise BadRequestException(
+            f"Amount ({data.amount}) exceeds remaining balance ({remaining:.2f})."
+        )
+
     repo = PaymentRepository(db)
     payment = await repo.create(data, current_user.id)
 
@@ -157,193 +166,6 @@ async def refund_payment(
     return updated
 
 
-@router.post("/stripe/create-intent")
-async def create_stripe_intent(
-    body: StripeIntentCreate,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    booking_repo = BookingRepository(db)
-    booking = await booking_repo.get_by_id(body.booking_id)
-    if not booking:
-        raise NotFoundException("Booking not found.")
-
-    if current_user.role.name == "Guest" and booking.guest_id != current_user.id:
-        raise BadRequestException("You can only pay for your own bookings.")
-
-    remaining_balance = float(booking.total_amount) - float(booking.paid_amount)
-    if remaining_balance <= 0:
-        raise BadRequestException("Booking is already fully paid.")
-
-    amount = remaining_balance
-
-    if amount <= 0:
-        raise BadRequestException("Payment amount must be greater than zero.")
-
-    if not settings.STRIPE_SECRET_KEY:
-        if settings.ENVIRONMENT != "development":
-            raise BadRequestException(
-                "Stripe is not configured. Set STRIPE_SECRET_KEY in .env to accept payments."
-            )
-        mock_id = f"pi_mock_{uuid.uuid4().hex[:12]}"
-        return {
-            "client_secret": f"mock_secret_{booking.id}_{int(amount)}_{uuid.uuid4().hex[:6]}",
-            "amount": amount,
-            "currency": "BDT",
-            "payment_intent_id": mock_id,
-            "is_mock": True,
-        }
-
-    try:
-        stripe.api_key = settings.STRIPE_SECRET_KEY
-        intent = stripe.PaymentIntent.create(
-            amount=int(amount * 100),
-            currency="usd",
-            metadata={
-                "booking_id": str(booking.id),
-                "guest_id": str(booking.guest_id),
-            },
-        )
-        return {
-            "client_secret": intent.client_secret,
-            "amount": amount,
-            "currency": "USD",
-            "payment_intent_id": intent.id,
-            "is_mock": False,
-        }
-    except Exception as e:
-        raise BadRequestException(f"Stripe PaymentIntent creation failed: {str(e)}")
-
-
-@router.post("/stripe/confirm")
-async def confirm_stripe_payment(
-    body: StripePaymentConfirm,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    booking_repo = BookingRepository(db)
-    booking = await booking_repo.get_by_id(body.booking_id)
-    if not booking:
-        raise NotFoundException("Booking not found.")
-
-    if current_user.role.name == "Guest" and booking.guest_id != current_user.id:
-        raise BadRequestException(
-            "You can only confirm payments for your own bookings."
-        )
-
-    payment_repo = PaymentRepository(db)
-    existing_payments = await payment_repo.get_by_booking(booking.id)
-    for p in existing_payments:
-        if p.transaction_ref == body.payment_intent_id:
-            return {"payment": PaymentRead.model_validate(p).model_dump()}
-
-    remaining_balance = float(booking.total_amount) - float(booking.paid_amount)
-    if remaining_balance <= 0:
-        raise BadRequestException("Booking is already fully paid.")
-
-    amount = remaining_balance
-
-    is_mock = body.payment_intent_id.startswith("pi_mock_")
-    if settings.STRIPE_SECRET_KEY and not is_mock:
-        try:
-            stripe.api_key = settings.STRIPE_SECRET_KEY
-            intent = stripe.PaymentIntent.retrieve(body.payment_intent_id)
-            if intent.status != "succeeded":
-                raise BadRequestException(
-                    f"Stripe payment was not successful: status is {intent.status}"
-                )
-            stripe_amount = intent.amount / 100.0
-            if stripe_amount > remaining_balance:
-                raise BadRequestException(
-                    f"Stripe amount ({stripe_amount}) exceeds remaining balance ({remaining_balance})"
-                )
-            if abs(stripe_amount - amount) > 0.1:
-                amount = stripe_amount
-        except Exception as e:
-            raise BadRequestException(f"Failed to verify payment with Stripe: {str(e)}")
-
-    payment_data = PaymentCreate(
-        booking_id=booking.id,
-        amount=amount,
-        payment_method="Card",
-        transaction_ref=body.payment_intent_id,
-        notes="Stripe payment (full).",
-    )
-    payment = await payment_repo.create(payment_data, current_user.id)
-
-    if booking.status == BookingStatus.pending:
-        await booking_repo.update_status(booking, BookingStatus.confirmed)
-
-    await db.refresh(booking, ["payments"])
-
-    booking_total = float(booking.total_amount)
-    room_info = ""
-    for br in booking.booking_rooms:
-        br_nights = (br.check_out_date - br.check_in_date).days
-        room_info += f"{br.room.room_type.name} x {br_nights} nights, "
-
-    desc = f"Full Payment - {room_info}"
-    inv_data = InvoiceCreate(
-        booking_id=booking.id,
-        due_date=booking.booking_rooms[0].check_in_date
-        if booking.booking_rooms
-        else booking.created_at.date(),
-        subtotal=amount,
-        tax_rate=0,
-        items=[
-            InvoiceItemCreate(
-                description=desc,
-                quantity=1,
-                unit_price=amount,
-                amount=amount,
-            )
-        ],
-    )
-    invoice_repo = InvoiceRepository(db)
-    invoice = await invoice_repo.create(inv_data, booking.guest_id)
-
-    new_paid = float(booking.paid_amount)
-    new_remaining = booking_total - new_paid
-
-    email_html = get_booking_confirmation_html(
-        guest_name=booking.guest.full_name,
-        room_name=room_info,
-        room_number=", ".join([br.room.room_number for br in booking.booking_rooms]),
-        check_in=str(booking.booking_rooms[0].check_in_date)
-        if booking.booking_rooms
-        else "",
-        check_out=str(booking.booking_rooms[0].check_out_date)
-        if booking.booking_rooms
-        else "",
-        nights=(
-            (
-                booking.booking_rooms[0].check_out_date
-                - booking.booking_rooms[0].check_in_date
-            ).days
-            if booking.booking_rooms
-            else 0
-        ),
-        total_amount=booking_total,
-        amount_paid=new_paid,
-        remaining_balance=new_remaining,
-        payment_status="Fully Settled",
-        booking_id=str(booking.id),
-    )
-
-    await asyncio.to_thread(
-        send_html_email,
-        to_email=booking.guest.email,
-        subject=f"StayEase Resort - Booking Confirmation #{booking.id}",
-        html_content=email_html,
-        text_content=f"Your booking at StayEase Resort has been confirmed! Booking ID: {booking.id}. Total: TK {booking_total:.2f}. Paid: TK {new_paid:.2f}.",
-    )
-
-    return {
-        "payment": PaymentRead.model_validate(payment).model_dump(),
-        "invoice_id": str(invoice.id),
-    }
-
-
 @router.post("/mobile-banking")
 async def pay_via_mobile_banking(
     body: MobileBankingPayment,
@@ -362,9 +184,12 @@ async def pay_via_mobile_banking(
     if remaining <= 0:
         raise BadRequestException("Booking is already fully paid.")
 
-    capped = min(body.amount, remaining)
-    if capped <= 0:
-        raise BadRequestException("Payment amount must be greater than zero.")
+    if body.amount > remaining + 0.01:
+        raise BadRequestException(
+            f"Amount ({body.amount}) exceeds remaining balance ({remaining:.2f}). "
+            f"Please enter an amount up to TK {remaining:.2f}."
+        )
+    capped = body.amount
 
     payment_data = PaymentCreate(
         booking_id=booking.id,
@@ -439,105 +264,3 @@ async def pay_via_mobile_banking(
         "payment": PaymentRead.model_validate(payment).model_dump(),
         "invoice_id": str(invoice.id),
     }
-
-
-@router.post("/stripe/webhook")
-async def stripe_webhook(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-):
-    payload = await request.body()
-    sig_header = request.headers.get("stripe-signature")
-
-    if settings.STRIPE_WEBHOOK_SECRET and sig_header:
-        try:
-            stripe.api_key = settings.STRIPE_SECRET_KEY
-            event = stripe.Webhook.construct_event(
-                payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
-            )
-        except Exception as e:
-            logger.error(f"Stripe webhook signature verification failed: {e}")
-            return JSONResponse(status_code=400, content={"error": "Invalid signature"})
-    elif settings.ENVIRONMENT == "development":
-        import json
-
-        event = json.loads(payload)
-        logger.warning(
-            "Stripe webhook signature verification skipped in development mode."
-        )
-    else:
-        logger.error(
-            "Webhook received without STRIPE_WEBHOOK_SECRET configured — rejecting."
-        )
-        return JSONResponse(
-            status_code=400, content={"error": "Webhook secret not configured"}
-        )
-
-    event_type = event.get("type") if isinstance(event, dict) else event.type
-
-    if event_type == "payment_intent.succeeded":
-        intent = (
-            event["data"]["object"] if isinstance(event, dict) else event.data.object
-        )
-        booking_id = (
-            intent.get("metadata", {}).get("booking_id")
-            if isinstance(intent, dict)
-            else intent.metadata.get("booking_id")
-        )
-        if booking_id:
-            try:
-                booking_uuid = uuid.UUID(booking_id)
-                from app.bookings.repository import BookingRepository
-                from app.bookings.models import BookingStatus
-                from app.payments.repository import PaymentRepository
-                from app.payments.schemas import PaymentCreate
-
-                booking_repo = BookingRepository(db)
-                booking = await booking_repo.get_by_id(booking_uuid)
-                if not booking:
-                    logger.warning(f"Webhook: booking {booking_id} not found")
-                    return {"status": "ok"}
-
-                intent_id = intent.get("id") if isinstance(intent, dict) else intent.id
-                amount = (
-                    intent.get("amount", 0) / 100.0
-                    if isinstance(intent, dict)
-                    else intent.amount / 100.0
-                )
-
-                payment_repo = PaymentRepository(db)
-                existing = await payment_repo.get_by_booking(booking_uuid)
-                if any(p.transaction_ref == intent_id for p in existing):
-                    logger.info(f"Webhook: payment {intent_id} already recorded")
-                    return {"status": "ok"}
-
-                payment_data = PaymentCreate(
-                    booking_id=booking_uuid,
-                    amount=amount,
-                    payment_method="Card",
-                    transaction_ref=intent_id,
-                    notes="Stripe payment via webhook.",
-                )
-                await payment_repo.create(payment_data, booking_uuid)
-
-                if booking.status == BookingStatus.pending:
-                    await booking_repo.update_status(booking, BookingStatus.confirmed)
-                    logger.info(
-                        f"Booking {booking_id} auto-confirmed and payment recorded via Stripe webhook"
-                    )
-            except Exception as e:
-                logger.error(f"Webhook booking confirmation failed: {e}")
-
-    elif event_type == "payment_intent.refunded":
-        intent = (
-            event["data"]["object"] if isinstance(event, dict) else event.data.object
-        )
-        booking_id = (
-            intent.get("metadata", {}).get("booking_id")
-            if isinstance(intent, dict)
-            else intent.metadata.get("booking_id")
-        )
-        if booking_id:
-            logger.info(f"Stripe refund webhook received for booking {booking_id}")
-
-    return {"status": "ok"}

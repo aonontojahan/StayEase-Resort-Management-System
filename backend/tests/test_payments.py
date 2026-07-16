@@ -161,24 +161,6 @@ async def test_refund_payment(client: AsyncClient, db_session: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_stripe_create_intent(client: AsyncClient, db_session: AsyncSession):
-    suffix = uuid.uuid4().hex[:6]
-    _, guest_token, booking, _ = await _setup_booking(client, db_session, suffix)
-
-    response = await client.post(
-        f"{API_PREFIX}/payments/stripe/create-intent",
-        json={"booking_id": booking["id"]},
-        headers={"Authorization": f"Bearer {guest_token}"},
-    )
-    assert response.status_code == status.HTTP_200_OK
-    data = response.json()
-    assert data["is_mock"] is True
-    assert data["amount"] == 900.0
-    assert "client_secret" in data
-    assert "payment_intent_id" in data
-
-
-@pytest.mark.asyncio
 async def test_mobile_banking_payment(client: AsyncClient, db_session: AsyncSession):
     suffix = uuid.uuid4().hex[:6]
     _, guest_token, booking, _ = await _setup_booking(client, db_session, suffix)

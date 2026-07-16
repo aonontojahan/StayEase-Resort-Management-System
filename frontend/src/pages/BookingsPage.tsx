@@ -62,7 +62,7 @@ export const BookingsPage: React.FC = () => {
   const [itemsPerPage] = useState(10)
   const [totalItems, setTotalItems] = useState(0)
   const totalPages = Math.ceil(totalItems / itemsPerPage)
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const fetchBookings = async (currentPage = page) => {
     setLoading(true)
@@ -268,7 +268,7 @@ export const BookingsPage: React.FC = () => {
           <button onClick={openWalkinModal} className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors">
             <UserPlus className="h-4 w-4" /> Walk-in Booking
           </button>
-          <button onClick={fetchBookings} className="rounded-lg border p-2 hover:bg-secondary transition-colors w-fit" title="Refresh">
+          <button onClick={() => fetchBookings()} className="rounded-lg border p-2 hover:bg-secondary transition-colors w-fit" title="Refresh">
             <RefreshCw className="h-4 w-4 text-muted-foreground" />
           </button>
         </div>

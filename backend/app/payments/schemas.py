@@ -1,7 +1,9 @@
 import uuid
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from app.payments.models import PaymentMethod
 
 
 class PaymentCreate(BaseModel):
@@ -10,6 +12,17 @@ class PaymentCreate(BaseModel):
     payment_method: str
     transaction_ref: Optional[str] = None
     notes: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_payment_method(cls, data):
+        if isinstance(data, dict):
+            pm = data.get("payment_method")
+            if pm and pm not in [m.value for m in PaymentMethod]:
+                raise ValueError(
+                    f"Invalid payment_method '{pm}'. Must be one of: {[m.value for m in PaymentMethod]}"
+                )
+        return data
 
 
 class BookingSimple(BaseModel):
@@ -46,19 +59,11 @@ class RevenueSummary(BaseModel):
     completed_payments: float
     refunded_payments: float
     cancellation_fees: float = 0.0
+    actual_refunded: float = 0.0
 
 
 class PaymentStatusUpdate(BaseModel):
     status: str
-
-
-class StripeIntentCreate(BaseModel):
-    booking_id: uuid.UUID
-
-
-class StripePaymentConfirm(BaseModel):
-    booking_id: uuid.UUID
-    payment_intent_id: str
 
 
 class MobileBankingPayment(BaseModel):

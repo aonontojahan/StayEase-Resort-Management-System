@@ -35,8 +35,16 @@ export const Login: React.FC = () => {
       await login(data)
       navigate("/dashboard")
     } catch (err: any) {
-      const errMsg = err.response?.data?.detail || "Invalid email or password. Please try again."
-      setServerError(errMsg)
+      console.error("Login error:", err)
+      if (err.response) {
+        const status = err.response.status
+        const detail = err.response.data?.detail
+        setServerError(detail || `Server error (${status}). Please try again.`)
+      } else if (err.request) {
+        setServerError("Cannot reach the server. Is the backend running?")
+      } else {
+        setServerError("An unexpected error occurred. Please try again.")
+      }
     }
   }
 

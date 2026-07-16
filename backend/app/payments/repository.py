@@ -79,7 +79,9 @@ class PaymentRepository:
         )
         return result.scalar_one_or_none()
 
-    async def create(self, data: PaymentCreate, recorded_by_id: uuid.UUID) -> Payment:
+    async def create(
+        self, data: PaymentCreate, recorded_by_id: Optional[uuid.UUID] = None
+    ) -> Payment:
         payment = Payment(
             booking_id=data.booking_id,
             recorded_by_id=recorded_by_id,
@@ -108,7 +110,7 @@ class PaymentRepository:
                 Payment.status == PaymentStatus.refunded
             )
         )
-        refunded = float(refund_result.scalar() or 0)
+        refunded_original = float(refund_result.scalar() or 0)
 
         fee_result = await self.db.execute(
             select(func.sum(Payment.cancellation_fee)).where(
@@ -117,14 +119,17 @@ class PaymentRepository:
         )
         cancellation_fees = float(fee_result.scalar() or 0)
 
-        net_revenue = completed - refunded + cancellation_fees
+        actual_refunded = refunded_original - cancellation_fees
+        total_revenue = completed + refunded_original
+        net_revenue = completed + cancellation_fees
         return RevenueSummary(
-            total_revenue=completed + cancellation_fees,
+            total_revenue=total_revenue,
             net_revenue=net_revenue,
             total_payments=total_count,
             completed_payments=completed,
-            refunded_payments=refunded,
+            refunded_payments=refunded_original,
             cancellation_fees=cancellation_fees,
+            actual_refunded=actual_refunded,
         )
 
     async def mark_refunded(
@@ -143,6 +148,8 @@ class PaymentRepository:
         payment = await self.get_by_id(payment_id)
         if not payment:
             return None
+        if payment.status == PaymentStatus.refunded:
+            return payment
         total_paid = float(payment.amount)
         cancellation_fee = min(
             total_paid * settings.CANCELLATION_FEE_PERCENTAGE,

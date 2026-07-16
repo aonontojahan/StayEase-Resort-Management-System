@@ -76,6 +76,10 @@ class Settings(BaseSettings):
             return v
         raise ValueError(v)
 
+    # Owner seeding credentials (read from .env, NOT os.environ)
+    OWNER_EMAIL: str = "admin@stayease.com"
+    OWNER_PASSWORD: str = ""
+
     # Rate Limiting
     RATE_LIMIT_MAX_REQUESTS: int = 20
     RATE_LIMIT_WINDOW_SECONDS: int = 60
@@ -84,10 +88,6 @@ class Settings(BaseSettings):
     CLOUDINARY_CLOUD_NAME: Optional[str] = None
     CLOUDINARY_API_KEY: Optional[str] = None
     CLOUDINARY_API_SECRET: Optional[str] = None
-
-    # Stripe Config
-    STRIPE_SECRET_KEY: Optional[str] = None
-    STRIPE_WEBHOOK_SECRET: Optional[str] = None
 
     # Client URL (for password reset / email verification links)
     CLIENT_URL: str = "http://localhost:5173"

@@ -50,11 +50,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
     color: "bg-red-100 text-red-800",
     icon: <XCircle className="h-3 w-3" />,
   },
-  CancelledFee: {
-    label: "Cancelled (Fee Retained)",
-    color: "bg-purple-100 text-purple-800",
-    icon: <TrendingDown className="h-3 w-3" />,
-  },
+
   Cancelled: {
     label: "Cancelled",
     color: "bg-gray-100 text-gray-800",
@@ -184,19 +180,20 @@ export const AccountantPage: React.FC = () => {
     }
   }
 
+  const CANCELLATION_FEE_RATE = 0.30
+
   const onConfirmRefund = async () => {
     if (!refundTarget) return
     setRefunding(true)
     try {
-      const total = refundTarget.booking.total_amount
-      const cancellationFee = total * 0.30
-      const refundAmount = refundTarget.amount - cancellationFee
+      const paymentAmount = refundTarget.amount
+      const cancellationFee = Math.min(paymentAmount * CANCELLATION_FEE_RATE, paymentAmount)
+      const refundAmount = paymentAmount - cancellationFee
 
       await api.post("/refunds/", {
         payment_id: refundTarget.id,
         amount: Math.max(0, refundAmount),
         refund_method: refundMethod,
-        cancellation_fee: cancellationFee,
         notes: refundRef ? `Ref: ${refundRef}` : undefined,
       })
       toastSuccess(`Refund of TK ${Math.max(0, refundAmount).toFixed(2)} initiated via ${refundMethod}.`)
@@ -422,7 +419,9 @@ export const AccountantPage: React.FC = () => {
               >
                 <option value="">All Methods</option>
                 <option value="Cash">Cash</option>
-                <option value="Card">Card</option>
+                <option value="bKash">bKash</option>
+                <option value="Nagad">Nagad</option>
+                <option value="Rocket">Rocket</option>
                 <option value="BankTransfer">Bank Transfer</option>
               </select>
               {/* Status */}
@@ -659,11 +658,11 @@ export const AccountantPage: React.FC = () => {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Cancellation Fee (30%)</span>
-                <span className="font-bold text-destructive">- TK {(refundTarget.booking.total_amount * 0.30).toFixed(2)}</span>
+                <span className="font-bold text-destructive">- TK {Math.min(refundTarget.amount * 0.30, refundTarget.amount).toFixed(2)}</span>
               </div>
               <div className="flex justify-between border-t pt-2 mt-2">
                 <span className="font-semibold">Refund Amount</span>
-                <span className="font-bold text-emerald-600">TK {Math.max(0, refundTarget.amount - refundTarget.booking.total_amount * 0.30).toFixed(2)}</span>
+                <span className="font-bold text-emerald-600">TK {Math.max(0, refundTarget.amount - refundTarget.amount * 0.30).toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Method</span>
@@ -682,7 +681,6 @@ export const AccountantPage: React.FC = () => {
                 onChange={(e) => setRefundMethod(e.target.value)}
                 className="block w-full rounded-lg border bg-card py-2.5 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               >
-                <option value="Stripe">Stripe (Card - Automatic)</option>
                 <option value="Cash">Cash (Immediate)</option>
                 <option value="bKash">bKash (Manual)</option>
                 <option value="Nagad">Nagad (Manual)</option>
@@ -723,7 +721,7 @@ export const AccountantPage: React.FC = () => {
       </Modal>
 
       {/* Refund History Modal */}
-      <Modal isOpen={showRefundHistory} title="Refund History" onClose={() => setShowRefundHistory(false)} size="lg">
+      <Modal isOpen={showRefundHistory} title="Refund History" onClose={() => setShowRefundHistory(false)} maxWidth="max-w-4xl">
         <div className="space-y-4 max-h-[70vh] overflow-y-auto">
           {refundSummary && (
             <div className="grid grid-cols-3 gap-3 pb-3 border-b">

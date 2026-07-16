@@ -9,14 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user, require_role
 from app.auth.models import User
-from app.bookings.models import BookingStatus
 from app.audit.service import get_client_ip, log_action
-from app.core.config import settings
 from app.core.database import get_db
 from app.core.exceptions import BadRequestException, NotFoundException
 from app.core.pagination import PaginationParams
 from app.core.email import send_html_email, get_refund_notification_html
-from app.payments.models import PaymentStatus, PaymentMethod
+from app.payments.models import PaymentStatus
 from app.payments.repository import PaymentRepository
 from app.refunds.repository import RefundRepository
 from app.refunds.models import RefundStatus
@@ -74,52 +72,33 @@ async def initiate_refund(
     booking = payment.booking
     refund_repo = RefundRepository(db)
 
-    # Determine refund flow based on method
     refund_method = body.refund_method
     refund_amount = body.amount
+    total_paid = float(payment.amount)
+    if refund_amount > total_paid:
+        raise BadRequestException(
+            f"Refund amount ({refund_amount}) cannot exceed payment amount ({total_paid})."
+        )
     cancellation_fee = min(
-        float(booking.total_amount) * settings.CANCELLATION_FEE_PERCENTAGE,
+        total_paid * settings.CANCELLATION_FEE_PERCENTAGE,
         refund_amount,
     )
     refund_status = RefundStatus.pending
     transaction_ref = None
     error_msg = None
 
-    if refund_method == "Stripe":
-        stripe_ref = payment.transaction_ref or ""
-        if stripe_ref.startswith("pi_mock_"):
-            transaction_ref = f"ref_mock_{uuid.uuid4().hex[:12]}"
-            refund_status = RefundStatus.completed
-        elif stripe_ref.startswith("pi_") and settings.STRIPE_SECRET_KEY:
-            try:
-                import stripe
-
-                stripe.api_key = settings.STRIPE_SECRET_KEY
-                stripe_refund = stripe.Refund.create(
-                    payment_intent=stripe_ref,
-                    amount=int(refund_amount * 100),
-                )
-                transaction_ref = stripe_refund.id
-                refund_status = RefundStatus.completed
-                logger.info(f"Stripe refund processed: {stripe_refund.id}")
-            except Exception as e:
-                error_msg = f"Stripe refund failed: {str(e)}"
-                logger.error(error_msg)
-                refund_status = RefundStatus.failed
-        else:
-            refund_status = RefundStatus.pending
-            transaction_ref = None
-
-    elif refund_method == "Cash":
-        # Cash refund is immediate
+    if refund_method == "Cash":
         refund_status = RefundStatus.completed
         transaction_ref = f"cash_ref_{uuid.uuid4().hex[:8]}"
-
+    elif refund_method in ("bKash", "Nagad", "Rocket", "BankTransfer"):
+        if payment.transaction_ref:
+            transaction_ref = f"{refund_method.lower()}_ref_{uuid.uuid4().hex[:8]}"
+            refund_status = RefundStatus.completed
+        else:
+            refund_status = RefundStatus.pending
     else:
-        # Mobile banking refund - pending, staff must process manually
         refund_status = RefundStatus.pending
 
-    # Create the refund record
     refund = await refund_repo.create(
         payment_id=body.payment_id,
         booking_id=booking.id,
@@ -200,6 +179,14 @@ async def complete_refund(
         raise BadRequestException("Only pending refunds can be completed.")
 
     result = await repo.complete(refund_id, body.transaction_ref, body.notes)
+
+    pay_repo = PaymentRepository(db)
+    refund = result  # refreshed refund from repo.complete()
+    if refund and refund.payment_id:
+        await pay_repo.mark_refunded(
+            refund.payment_id,
+            float(refund.cancellation_fee or 0),
+        )
 
     await log_action(
         db=db,

@@ -150,7 +150,9 @@ class BookingRepository:
     async def delete(self, booking: Booking) -> None:
         from app.invoices.models import Invoice
         from app.payments.models import Payment
+        from app.refunds.models import Refund
 
+        await self.db.execute(sa_delete(Refund).where(Refund.booking_id == booking.id))
         await self.db.execute(
             sa_delete(Invoice).where(Invoice.booking_id == booking.id)
         )

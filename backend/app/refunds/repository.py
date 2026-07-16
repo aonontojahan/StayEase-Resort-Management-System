@@ -92,7 +92,9 @@ class RefundRepository:
         refund.transaction_ref = transaction_ref
         refund.completed_at = datetime.now(timezone.utc)
         if notes:
-            refund.notes = notes
+            refund.notes = (
+                (refund.notes or "") + f" | {notes}" if refund.notes else notes
+            )
         self.db.add(refund)
         await self.db.flush()
         return await self.get_by_id(refund_id)

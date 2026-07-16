@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import uuid
 from typing import List
@@ -213,38 +214,18 @@ async def update_booking_status(
                 payment_portion = float(p.amount) / paid if paid > 0 else 0
                 payment_fee = total_cancellation_fee * payment_portion
                 payment_fee = min(payment_fee, float(p.amount))
+                refund_amount = float(p.amount) - payment_fee
 
                 p.cancellation_fee = payment_fee
                 p.status = PaymentStatus.refunded
                 db.add(p)
-
-                refund_amount = float(p.amount) - payment_fee
-                try:
-                    if (
-                        p.payment_method.value == "Card"
-                        and p.transaction_ref
-                        and not p.transaction_ref.startswith("pi_mock_")
-                    ):
-                        import stripe
-
-                        stripe.api_key = settings.STRIPE_SECRET_KEY
-                        stripe.Refund.create(
-                            payment_intent=p.transaction_ref,
-                            amount=int(refund_amount * 100),
-                        )
-                except Exception as stripe_err:
-                    logger.warning(
-                        f"Stripe refund failed for payment {p.id}: {stripe_err}"
-                    )
 
                 refund_rec = await refund_repo.create(
                     payment_id=p.id,
                     booking_id=booking.id,
                     amount=refund_amount,
                     cancellation_fee=payment_fee,
-                    refund_method="Stripe"
-                    if p.payment_method.value == "Card"
-                    else p.payment_method.value,
+                    refund_method=p.payment_method.value,
                     initiated_by_id=current_user.id,
                     status=RefundStatus.completed,
                     notes=f"Cancellation refund for booking {booking.id}",
@@ -265,7 +246,8 @@ async def update_booking_status(
                         [str(p.id)[:8] for p in completed_payments]
                     ),
                 )
-                send_html_email(
+                await asyncio.to_thread(
+                    send_html_email,
                     to_email=booking.guest.email,
                     subject=f"StayEase Resort - Booking #{booking.id} Cancelled",
                     html_content=email_html,

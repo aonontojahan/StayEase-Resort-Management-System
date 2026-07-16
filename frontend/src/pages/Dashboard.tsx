@@ -39,11 +39,13 @@ export const Dashboard: React.FC = () => {
   const [occupancy, setOccupancy] = useState<OccupancyReport | null>(null)
   const [bookingsSummary, setBookingsSummary] = useState<BookingsSummary | null>(null)
   const [revenueReport, setRevenueReport] = useState<RevenueReport[]>([])
+  const [dashboardError, setDashboardError] = useState<string | null>(null)
   const [loadingDashboard, setLoadingDashboard] = useState(false)
 
   const fetchDashboardData = async () => {
     if (!user || !["Resort Owner", "Manager", "Accountant"].includes(user.role.name)) return
     setLoadingDashboard(true)
+    setDashboardError(null)
     try {
       const [occRes, summaryRes, revRes] = await Promise.all([
         api.get<OccupancyReport>("/reports/occupancy"),
@@ -53,8 +55,9 @@ export const Dashboard: React.FC = () => {
       setOccupancy(occRes.data)
       setBookingsSummary(summaryRes.data)
       setRevenueReport(revRes.data)
-    } catch {
-      // Dashboard metrics error is non-critical; no user toast needed
+    } catch (err: any) {
+      const msg = err.response?.data?.detail || err.message || "Failed to load dashboard data"
+      setDashboardError(msg)
     } finally {
       setLoadingDashboard(false)
     }
@@ -202,6 +205,11 @@ export const Dashboard: React.FC = () => {
               </div>
             </div>
 
+            {dashboardError && (
+              <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive">
+                Dashboard data error: {dashboardError}. Please refresh.
+              </div>
+            )}
             {loadingDashboard ? (
               <StatsGridSkeleton />
             ) : (

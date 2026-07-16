@@ -8,7 +8,6 @@ class RefundCreate(BaseModel):
     payment_id: uuid.UUID
     refund_method: str = "Stripe"
     amount: float = Field(..., gt=0)
-    cancellation_fee: Optional[float] = 0
     notes: Optional[str] = None
 
 

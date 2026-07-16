@@ -252,7 +252,7 @@ export const RoomsPage: React.FC = () => {
           </select>
           <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         </div>
-        <button onClick={fetchData} className="rounded-lg border p-2 hover:bg-secondary transition-colors" title="Refresh">
+        <button onClick={() => fetchData()} className="rounded-lg border p-2 hover:bg-secondary transition-colors" title="Refresh">
           <RefreshCw className="h-4 w-4 text-muted-foreground" />
         </button>
       </div>
