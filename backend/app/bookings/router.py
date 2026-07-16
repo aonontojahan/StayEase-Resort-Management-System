@@ -261,7 +261,13 @@ async def update_booking_status(
                 room = await room_repo.get_by_id(br.room_id)
                 if room:
                     await room_repo.update(room, {"status": "Cleaning"})
-        return await repo.update_status(booking, new_status)
+        result = await repo.update_status(booking, new_status)
+        try:
+            from app.ws.manager import manager
+            await manager.broadcast({"type": "dashboard_update"})
+        except Exception:
+            logger.warning("WebSocket broadcast failed")
+        return result
 
     room_repo = RoomRepository(db)
     if new_status == BookingStatus.checked_in:
@@ -270,42 +276,10 @@ async def update_booking_status(
             if room:
                 await room_repo.update(room, {"status": "Occupied"})
     elif new_status == BookingStatus.checked_out:
-        from app.housekeeping.repository import HousekeepingRepository
-        from app.housekeeping.schemas import TaskCreate
-
-        hk_repo = HousekeepingRepository(db)
-        assigned_hk_id = await hk_repo.find_least_busy_housekeeper()
         for br in booking.booking_rooms:
             room = await room_repo.get_by_id(br.room_id)
-            room_label = room.room_number if room else br.room_id
-            room_type_name = room.room_type.name if room else "Unknown"
             if room:
-                await room_repo.update(room, {"status": "Cleaning"})
-            task = await hk_repo.create(
-                TaskCreate(
-                    room_id=br.room_id,
-                    assigned_to_id=assigned_hk_id,
-                    title=f"Clean Room {room_label} after checkout",
-                    description=f"Guest checked out. Booking #{str(booking.id)[:8]}. Room {room_label} ({room_type_name}).",
-                    priority="Medium",
-                ),
-                created_by_id=current_user.id,
-            )
-            try:
-                from app.ws.manager import manager
-
-                await manager.broadcast_to_room(
-                    "housekeeping",
-                    {
-                        "type": "housekeeping_task",
-                        "task_id": str(task.id),
-                        "room_number": room_label,
-                        "room_type": room_type_name,
-                        "assigned_to": str(assigned_hk_id) if assigned_hk_id else None,
-                    },
-                )
-            except Exception as e:
-                logger.warning(f"WebSocket broadcast failed: {e}")
+                await room_repo.update(room, {"status": "Available"})
 
     return await repo.update_status(booking, new_status)
 
@@ -331,6 +305,12 @@ async def check_in_booking(
             await room_repo.update(room, {"status": "Occupied"})
 
     result = await repo.update_status(booking, BookingStatus.checked_in)
+
+    try:
+        from app.ws.manager import manager
+        await manager.broadcast({"type": "dashboard_update"})
+    except Exception:
+        logger.warning("WebSocket broadcast failed")
 
     await log_action(
         db=db,
@@ -361,44 +341,18 @@ async def check_out_booking(
         raise BadRequestException("Booking must be checked in before check-out.")
 
     room_repo = RoomRepository(db)
-    from app.housekeeping.repository import HousekeepingRepository
-    from app.housekeeping.schemas import TaskCreate
-
-    hk_repo = HousekeepingRepository(db)
-    assigned_hk_id = await hk_repo.find_least_busy_housekeeper()
     for br in booking.booking_rooms:
         room = await room_repo.get_by_id(br.room_id)
-        room_label = room.room_number if room else br.room_id
-        room_type_name = room.room_type.name if room else "Unknown"
         if room:
-            await room_repo.update(room, {"status": "Cleaning"})
-        task = await hk_repo.create(
-            TaskCreate(
-                room_id=br.room_id,
-                assigned_to_id=assigned_hk_id,
-                title=f"Clean Room {room_label} after checkout",
-                description=f"Guest checked out. Booking #{str(booking.id)[:8]}. Room {room_label} ({room_type_name}).",
-                priority="Medium",
-            ),
-            created_by_id=current_user.id,
-        )
-        try:
-            from app.ws.manager import manager
-
-            await manager.broadcast_to_room(
-                "housekeeping",
-                {
-                    "type": "housekeeping_task",
-                    "task_id": str(task.id),
-                    "room_number": room_label,
-                    "room_type": room_type_name,
-                    "assigned_to": str(assigned_hk_id) if assigned_hk_id else None,
-                },
-            )
-        except Exception as e:
-            logger.warning(f"WebSocket broadcast failed: {e}")
+            await room_repo.update(room, {"status": "Available"})
 
     result = await repo.update_status(booking, BookingStatus.checked_out)
+
+    try:
+        from app.ws.manager import manager
+        await manager.broadcast({"type": "dashboard_update"})
+    except Exception:
+        logger.warning("WebSocket broadcast failed")
 
     await log_action(
         db=db,

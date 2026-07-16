@@ -104,10 +104,24 @@ export interface BookingCreate {
 }
 
 // ── Payments ──────────────────────────────────────────────────────────────
+export interface RoomSimpleBooking {
+  id: string
+  room_number: string
+}
+
+export interface BookingRoomSimple {
+  id: string
+  check_in_date: string
+  check_out_date: string
+  num_guests: number
+  room: RoomSimpleBooking
+}
+
 export interface BookingSimple {
   id: string
   total_amount: number
   status: string
+  booking_rooms: BookingRoomSimple[]
 }
 
 export interface UserSimple {

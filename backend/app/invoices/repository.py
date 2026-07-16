@@ -132,6 +132,10 @@ class InvoiceRepository:
         await self.db.flush()
         return await self.get_by_id(invoice.id)
 
+    async def delete(self, invoice: Invoice) -> None:
+        await self.db.delete(invoice)
+        await self.db.flush()
+
     async def get_summary(self) -> dict:
         total_result = await self.db.execute(
             select(

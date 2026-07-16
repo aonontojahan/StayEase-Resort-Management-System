@@ -12,11 +12,13 @@ from app.auth.dependencies import get_current_user, require_role
 from app.auth.models import User
 from app.bookings.repository import BookingRepository
 from app.bookings.models import BookingStatus
+from app.rooms.repository import RoomRepository
 from app.core.database import get_db
 from app.core.email import send_html_email, get_booking_confirmation_html
 from app.core.exceptions import BadRequestException, NotFoundException
 from app.core.pagination import PaginationParams
 from app.invoices.schemas import InvoiceCreate, InvoiceItemCreate
+from app.invoices.models import InvoiceStatus
 from app.invoices.repository import InvoiceRepository
 from app.payments.repository import PaymentRepository
 from app.payments.schemas import (
@@ -121,9 +123,21 @@ async def record_payment(
     payment = await repo.create(data, current_user.id)
 
     if booking.status == BookingStatus.pending:
+        room_ids = [br.room_id for br in booking.booking_rooms]
         await booking_repo.update_status(booking, BookingStatus.confirmed)
+        room_repo = RoomRepository(db)
+        for rid in room_ids:
+            room = await room_repo.get_by_id(rid)
+            if room:
+                await room_repo.update(room, {"status": "Occupied"})
 
     await db.refresh(booking, ["payments"])
+
+    try:
+        from app.ws.manager import manager
+        await manager.broadcast({"type": "dashboard_update"})
+    except Exception:
+        logger.warning("WebSocket broadcast failed")
 
     desc = f"Full Payment - {booking.id}"
     inv_data = InvoiceCreate(
@@ -144,6 +158,7 @@ async def record_payment(
     )
     invoice_repo = InvoiceRepository(db)
     invoice = await invoice_repo.create(inv_data, booking.guest_id)
+    invoice = await invoice_repo.update_status(invoice, InvoiceStatus.paid)
 
     return {
         "payment": PaymentRead.model_validate(payment).model_dump(),
@@ -203,7 +218,13 @@ async def pay_via_mobile_banking(
     payment = await payment_repo.create(payment_data, current_user.id)
 
     if booking.status == BookingStatus.pending:
+        room_ids = [br.room_id for br in booking.booking_rooms]
         await booking_repo.update_status(booking, BookingStatus.confirmed)
+        room_repo = RoomRepository(db)
+        for rid in room_ids:
+            room = await room_repo.get_by_id(rid)
+            if room:
+                await room_repo.update(room, {"status": "Occupied"})
 
     await db.refresh(booking, ["payments"])
 
@@ -228,6 +249,7 @@ async def pay_via_mobile_banking(
     )
     invoice_repo = InvoiceRepository(db)
     invoice = await invoice_repo.create(inv_data, booking.guest_id)
+    invoice = await invoice_repo.update_status(invoice, InvoiceStatus.paid)
 
     new_paid = float(booking.paid_amount)
     new_remaining = booking_total - new_paid
@@ -260,6 +282,12 @@ async def pay_via_mobile_banking(
         html_content=email_html,
         text_content=f"Your booking at StayEase Resort has been confirmed! Booking ID: {booking.id}. Total: TK {booking_total:.2f}. Paid: TK {new_paid:.2f}.",
     )
+
+    try:
+        from app.ws.manager import manager
+        await manager.broadcast({"type": "dashboard_update"})
+    except Exception:
+        logger.warning("WebSocket broadcast failed")
 
     return {
         "payment": PaymentRead.model_validate(payment).model_dump(),
@@ -302,7 +330,13 @@ async def pay_via_card(
     payment = await payment_repo.create(payment_data, current_user.id)
 
     if booking.status == BookingStatus.pending:
+        room_ids = [br.room_id for br in booking.booking_rooms]
         await booking_repo.update_status(booking, BookingStatus.confirmed)
+        room_repo = RoomRepository(db)
+        for rid in room_ids:
+            room = await room_repo.get_by_id(rid)
+            if room:
+                await room_repo.update(room, {"status": "Occupied"})
 
     await db.refresh(booking, ["payments"])
 
@@ -327,6 +361,7 @@ async def pay_via_card(
     )
     invoice_repo = InvoiceRepository(db)
     invoice = await invoice_repo.create(inv_data, booking.guest_id)
+    invoice = await invoice_repo.update_status(invoice, InvoiceStatus.paid)
 
     new_paid = float(booking.paid_amount)
     new_remaining = booking_total - new_paid
@@ -359,6 +394,12 @@ async def pay_via_card(
         html_content=email_html,
         text_content=f"Your booking at StayEase Resort has been confirmed! Booking ID: {booking.id}. Total: TK {booking_total:.2f}. Paid: TK {new_paid:.2f}.",
     )
+
+    try:
+        from app.ws.manager import manager
+        await manager.broadcast({"type": "dashboard_update"})
+    except Exception:
+        logger.warning("WebSocket broadcast failed")
 
     return {
         "payment": PaymentRead.model_validate(payment).model_dump(),

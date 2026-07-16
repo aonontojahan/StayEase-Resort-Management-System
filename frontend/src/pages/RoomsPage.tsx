@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { api, apiGet } from "@/services/api"
 import { Room, RoomType, RoomCreate, RoomUpdate, RoomTypeCreate } from "@/types/api"
+import { useWebSocket } from "@/hooks/useWebSocket"
 import { Pagination } from "@/components/Pagination"
 import { TableSkeleton } from "@/components/Skeleton"
 import { useToast } from "@/components/Toast"
@@ -72,13 +73,17 @@ export const RoomsPage: React.FC = () => {
   const editForm = useForm<RoomUpdate>({ resolver: zodResolver(roomUpdateSchema) })
   const typeForm = useForm<any>({ resolver: zodResolver(roomTypeSchema) })
 
+  const freshRef = useRef(true)
+  const pageRef = useRef(page)
+
   const fetchData = async (currentPage = page) => {
     setLoading(true)
+    pageRef.current = currentPage
     const skip = (currentPage - 1) * itemsPerPage
     try {
       const [roomsRes, typesRes] = await Promise.all([
-        apiGet<Room[]>("/rooms", { params: { skip, limit: itemsPerPage } }),
-        apiGet<RoomType[]>("/room-types"),
+        apiGet<Room[]>("/rooms", { params: { skip, limit: itemsPerPage }, ...(freshRef.current ? { fresh: true } : {}) }),
+        apiGet<RoomType[]>("/room-types", { ...(freshRef.current ? { fresh: true } : {}) }),
       ])
       setRooms(roomsRes.data)
       setTotalItems(parseInt(roomsRes.headers["x-total-count"] || "0", 10))
@@ -87,11 +92,23 @@ export const RoomsPage: React.FC = () => {
       toastError("Failed to load rooms data.")
     } finally {
       setLoading(false)
+      freshRef.current = false
     }
   }
 
   useEffect(() => {
+    freshRef.current = true
     fetchData(1)
+  }, [])
+
+  const { onMessage } = useWebSocket()
+
+  useEffect(() => {
+    const unsub = onMessage("dashboard_update", () => {
+      freshRef.current = true
+      fetchData(pageRef.current)
+    })
+    return unsub
   }, [])
 
   // Apply filters and sort rooms by number (ascending)
@@ -286,9 +303,6 @@ export const RoomsPage: React.FC = () => {
           <h2 className="text-3xl font-serif tracking-wide flex items-center gap-2">
             <BedDouble className="h-7 w-7 text-primary" /> Rooms Management
           </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            {totalItems} total rooms · {roomTypes.length} room types
-          </p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <button
@@ -307,13 +321,19 @@ export const RoomsPage: React.FC = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+        <div className="rounded-xl border bg-card p-4 shadow-sm">
+          <p className="text-xs text-muted-foreground font-medium">Total Room</p>
+          <p className="text-2xl font-bold mt-1 text-primary">{totalItems}</p>
+        </div>
+        <div className="rounded-xl border bg-card p-4 shadow-sm">
+          <p className="text-xs text-muted-foreground font-medium">Room Type</p>
+          <p className="text-2xl font-bold mt-1 text-indigo-600">{roomTypes.length}</p>
+        </div>
         {["Available", "Occupied", "Cleaning", "Maintenance", "Cleaned"].map((s) => (
           <div key={s} className="rounded-xl border bg-card p-4 shadow-sm">
             <p className="text-xs text-muted-foreground font-medium">{s}</p>
-            <p className="text-2xl font-bold mt-1">
-              {rooms.filter((r) => r.status === s).length}
-            </p>
+            <p className="text-2xl font-bold mt-1">{rooms.filter((r) => r.status === s).length}</p>
           </div>
         ))}
       </div>

@@ -2,12 +2,20 @@ import React, { useEffect, useState } from "react"
 import { apiGet } from "@/services/api"
 import { Payment } from "@/types/api"
 import { useToast } from "@/components/Toast"
-import { CreditCard, Loader2, RefreshCw, CheckCircle, Clock } from "lucide-react"
+import { CreditCard, Loader2, RefreshCw, CalendarDays, Hash, DoorOpen, Banknote } from "lucide-react"
 
 const STATUS_COLORS: Record<string, string> = {
   Completed: "bg-green-100 text-green-800",
   Pending: "bg-yellow-100 text-yellow-800",
   Refunded: "bg-red-100 text-red-800",
+}
+
+function fmt(d: string) {
+  return new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+}
+
+function shortId(id: string) {
+  return id.slice(0, 8).toUpperCase()
 }
 
 export const PaymentHistoryPage: React.FC = () => {
@@ -67,31 +75,53 @@ export const PaymentHistoryPage: React.FC = () => {
             </a>
           </div>
         ) : (
-          <div className="divide-y">
-            {payments.map((p) => (
-              <div key={p.id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-muted/20 transition-colors">
-                <div className="flex items-center gap-4">
-                  <div className={`h-12 w-12 rounded-full flex items-center justify-center shrink-0 ${p.status === 'Completed' ? 'bg-green-100 text-green-600' : p.status === 'Pending' ? 'bg-yellow-100 text-yellow-600' : 'bg-red-100 text-red-600'}`}>
-                    {p.status === 'Completed' ? <CheckCircle className="h-6 w-6" /> : <Clock className="h-6 w-6" />}
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-lg">TK {p.amount.toFixed(2)}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {new Date(p.created_at).toLocaleDateString()} · {p.payment_method}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex flex-col sm:items-end gap-1">
-                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_COLORS[p.status] || "bg-gray-100 text-gray-700"} w-fit`}>
-                    {p.status}
-                  </span>
-                  {p.transaction_ref && (
-                    <p className="text-xs text-muted-foreground font-mono mt-1">Ref: {p.transaction_ref}</p>
-                  )}
-                </div>
-              </div>
-            ))}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/40 text-muted-foreground">
+                  <th className="text-left py-3 px-4 font-semibold"><span className="flex items-center gap-1.5"><DoorOpen className="h-3.5 w-3.5" /> Room</span></th>
+                  <th className="text-left py-3 px-4 font-semibold"><span className="flex items-center gap-1.5"><Hash className="h-3.5 w-3.5" /> Confirmation</span></th>
+                  <th className="text-left py-3 px-4 font-semibold"><span className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5" /> Check-in</span></th>
+                  <th className="text-left py-3 px-4 font-semibold"><span className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5" /> Check-out</span></th>
+                  <th className="text-left py-3 px-4 font-semibold"><span className="flex items-center gap-1.5"><Banknote className="h-3.5 w-3.5" /> Amount</span></th>
+                  <th className="text-left py-3 px-4 font-semibold">Method</th>
+                  <th className="text-right py-3 px-4 font-semibold">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {payments.map((p) => {
+                  const room = p.booking.booking_rooms?.[0]
+                  return (
+                    <tr key={p.id} className="hover:bg-muted/20 transition-colors">
+                      <td className="py-3 px-4 font-medium">
+                        {room ? room.room.room_number : "—"}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span title={p.booking.id} className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">
+                          #{shortId(p.booking.id)}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground">
+                        {room ? fmt(room.check_in_date) : "—"}
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground">
+                        {room ? fmt(room.check_out_date) : "—"}
+                      </td>
+                      <td className="py-3 px-4 font-semibold">TK {p.amount.toFixed(2)}</td>
+                      <td className="py-3 px-4 text-muted-foreground capitalize">{p.payment_method}</td>
+                      <td className="py-3 px-4 text-right">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_COLORS[p.status] || "bg-gray-100 text-gray-700"}`}>
+                          {p.status}
+                        </span>
+                        {p.transaction_ref && (
+                          <p className="text-[10px] text-muted-foreground font-mono mt-0.5">Ref: {p.transaction_ref}</p>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

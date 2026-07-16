@@ -488,7 +488,7 @@ export const BrowseRoomsPage: React.FC = () => {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="font-bold text-lg">
-            {searched ? `${rooms.length} Room${rooms.length !== 1 ? "s" : ""} Available` : "Our Rooms & Suites"}
+            {searched ? `${rooms.filter(r => r.is_available === true).length} Available` : "Our Rooms & Suites"}
           </h3>
           {cart.length > 0 && (
             <button

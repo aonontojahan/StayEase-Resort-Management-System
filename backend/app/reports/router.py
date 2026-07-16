@@ -1,15 +1,15 @@
 import csv
 import io
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 
 from app.auth.dependencies import require_role
 from app.auth.models import User
-from app.bookings.models import Booking, BookingStatus
+from app.bookings.models import Booking, BookingRoom, BookingStatus
 from app.core.database import get_db
 from app.payments.models import Payment, PaymentStatus
 from app.payments.repository import PaymentRepository
@@ -25,20 +25,38 @@ async def occupancy_report(
     _: User = require_role(ANALYTICS_ROLES),
     db: AsyncSession = Depends(get_db),
 ):
-    """Return occupancy statistics."""
+    """Return occupancy statistics.
+
+    A room is considered occupied if:
+      - Its status is 'Occupied', OR
+      - It has a BookingRoom with status Confirmed or CheckedIn
+        whose date range includes today (check_in <= today < check_out).
+    """
+    today = date.today()
+
     total_rooms_result = await db.execute(select(func.count(Room.id)))
     total_rooms = int(total_rooms_result.scalar() or 0)
 
-    occupied_result = await db.execute(
-        select(func.count(Room.id)).where(Room.status == RoomStatus.occupied)
+    # ── Rooms physically marked Occupied ──
+    occupied_by_status_result = await db.execute(
+        select(Room.id).where(Room.status == RoomStatus.occupied)
     )
-    occupied = int(occupied_result.scalar() or 0)
+    occupied_by_status = {row[0] for row in occupied_by_status_result.all()}
 
-    available_result = await db.execute(
-        select(func.count(Room.id)).where(Room.status == RoomStatus.available)
+    # ── Rooms with an active booking overlapping today ──
+    active_rooms_result = await db.execute(
+        select(BookingRoom.room_id).where(
+            BookingRoom.status.in_([BookingStatus.confirmed, BookingStatus.checked_in]),
+            BookingRoom.check_in_date <= today,
+            BookingRoom.check_out_date > today,
+        )
     )
-    available = int(available_result.scalar() or 0)
+    active_booking_rooms = {row[0] for row in active_rooms_result.all()}
 
+    occupied_ids = occupied_by_status | active_booking_rooms
+    occupied = len(occupied_ids)
+
+    # Remaining counts (cleaning / maintenance)
     cleaning_result = await db.execute(
         select(func.count(Room.id)).where(Room.status == RoomStatus.cleaning)
     )
@@ -48,6 +66,8 @@ async def occupancy_report(
         select(func.count(Room.id)).where(Room.status == RoomStatus.maintenance)
     )
     maintenance = int(maintenance_result.scalar() or 0)
+
+    available = max(total_rooms - occupied - cleaning - maintenance, 0)
 
     occupancy_rate = round((occupied / total_rooms * 100), 1) if total_rooms > 0 else 0
 

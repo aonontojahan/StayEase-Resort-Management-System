@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -25,11 +25,27 @@ class PaymentCreate(BaseModel):
         return data
 
 
-class BookingSimple(BaseModel):
+class RoomSimple(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    room_number: str
+
+
+class BookingRoomSimple(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    check_in_date: date
+    check_out_date: date
+    num_guests: int
+    room: RoomSimple
+
+
+class BookingWithRooms(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     total_amount: float
     status: str
+    booking_rooms: list[BookingRoomSimple] = []
 
 
 class UserSimple(BaseModel):
@@ -47,7 +63,7 @@ class PaymentRead(BaseModel):
     transaction_ref: Optional[str] = None
     notes: Optional[str] = None
     cancellation_fee: Optional[float] = None
-    booking: BookingSimple
+    booking: BookingWithRooms
     recorded_by: Optional[UserSimple] = None
     created_at: datetime
 

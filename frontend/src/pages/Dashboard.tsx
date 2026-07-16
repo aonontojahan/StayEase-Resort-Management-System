@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { useAuth } from "@/store/AuthContext"
 import { apiGet } from "@/services/api"
 import { OccupancyReport, BookingsSummary, RevenueReport } from "@/types/api"
+import { useWebSocket } from "@/hooks/useWebSocket"
 import { 
   Home, BookOpen, BedDouble, Sparkles, CreditCard, FileText, Menu, X,
   UserCheck, UserCircle, LogIn, LogOut, Sun, Moon
@@ -66,11 +67,30 @@ export const Dashboard: React.FC = () => {
     }
   }
 
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
   useEffect(() => {
     if (activeTab === "Dashboard") {
       fetchDashboardData()
+      pollRef.current = setInterval(fetchDashboardData, 30000)
+    }
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current)
+        pollRef.current = null
+      }
     }
   }, [user, activeTab])
+
+  const { onMessage } = useWebSocket()
+
+  useEffect(() => {
+    if (activeTab !== "Dashboard") return
+    const unsub = onMessage("dashboard_update", () => {
+      fetchDashboardData()
+    })
+    return unsub
+  }, [activeTab])
 
   // Set default tab based on role if they are on "Dashboard"
   useEffect(() => {

@@ -12,7 +12,7 @@ import { useAuth } from "@/store/AuthContext"
 import { useToast } from "@/components/Toast"
 import { Modal } from "@/components/Modal"
 import {
-  FileText, Loader2, RefreshCw, Eye, Download,
+  FileText, Loader2, RefreshCw, Eye, Download, Trash2,
   CheckCircle2, Clock, XCircle, DollarSign,
 } from "lucide-react"
 
@@ -70,6 +70,18 @@ export const InvoicesPage: React.FC = () => {
       fetchData()
     } catch (err: any) {
       toastError(err.response?.data?.detail || "Failed to update invoice.")
+    }
+  }
+
+  const deleteInvoice = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this invoice? This action cannot be undone.")) return
+    try {
+      await api.delete(`/invoices/${id}`)
+      toastSuccess("Invoice deleted.")
+      setSelectedInvoice(null)
+      fetchData()
+    } catch (err: any) {
+      toastError(err.response?.data?.detail || "Failed to delete invoice.")
     }
   }
 
@@ -212,6 +224,12 @@ export const InvoicesPage: React.FC = () => {
                                 className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold text-emerald-600 hover:bg-emerald-50 transition-colors"
                               >
                                 <Download className="h-3 w-3" /> PDF
+                              </button>
+                              <button
+                                onClick={() => deleteInvoice(inv.id)}
+                                className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors"
+                              >
+                                <Trash2 className="h-3 w-3" /> Delete
                               </button>
                             </div>
                           </td>
@@ -373,6 +391,12 @@ export const InvoicesPage: React.FC = () => {
                   </>
                 )}
               </div>
+              <button
+                onClick={() => deleteInvoice(selectedInvoice.id)}
+                className="flex items-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors"
+              >
+                <Trash2 className="h-4 w-4" /> Delete Invoice
+              </button>
               <button
                 onClick={() => downloadPdf(selectedInvoice.id)}
                 className="flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-sm"

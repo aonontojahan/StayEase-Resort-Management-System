@@ -40,6 +40,14 @@ export async function apiGet<T = any>(
   config?: any,
   ttl = CACHE_TTL_MS,
 ): Promise<{ data: T; headers: Record<string, string> }> {
+  const opts = config?.fresh ? { ...config, fresh: undefined } : config
+  if (config?.fresh) {
+    const res = await api.get<T>(url, opts)
+    const key = cacheKey(url, config)
+    cache.set(key, { data: res.data, headers: res.headers as Record<string, string>, fetchedAt: Date.now() })
+    return { data: res.data, headers: res.headers as Record<string, string> }
+  }
+
   const key = cacheKey(url, config)
   const cached = cache.get(key)
   const now = Date.now()

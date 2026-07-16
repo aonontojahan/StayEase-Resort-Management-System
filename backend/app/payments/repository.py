@@ -7,20 +7,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.payments.models import Payment, PaymentMethod, PaymentStatus
 from app.payments.schemas import PaymentCreate, RevenueSummary
-from app.bookings.models import Booking
+from app.bookings.models import Booking, BookingRoom
 
 
 class PaymentRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
+    def _base_options(self):
+        return [
+            selectinload(Payment.booking).selectinload(Booking.booking_rooms).selectinload(BookingRoom.room),
+            selectinload(Payment.recorded_by),
+        ]
+
     async def get_all(self, skip: int = 0, limit: int = 100) -> Sequence[Payment]:
         result = await self.db.execute(
             select(Payment)
-            .options(
-                selectinload(Payment.booking),
-                selectinload(Payment.recorded_by),
-            )
+            .options(*self._base_options())
             .order_by(Payment.created_at.desc())
             .offset(skip)
             .limit(limit)
@@ -35,10 +38,7 @@ class PaymentRepository:
         result = await self.db.execute(
             select(Payment)
             .where(Payment.booking_id == booking_id)
-            .options(
-                selectinload(Payment.booking),
-                selectinload(Payment.recorded_by),
-            )
+            .options(*self._base_options())
             .order_by(Payment.created_at.desc())
         )
         return result.scalars().all()
@@ -50,10 +50,7 @@ class PaymentRepository:
             select(Payment)
             .join(Booking, Payment.booking_id == Booking.id)
             .where(Booking.guest_id == guest_id)
-            .options(
-                selectinload(Payment.booking),
-                selectinload(Payment.recorded_by),
-            )
+            .options(*self._base_options())
             .order_by(Payment.created_at.desc())
             .offset(skip)
             .limit(limit)
@@ -72,10 +69,7 @@ class PaymentRepository:
         result = await self.db.execute(
             select(Payment)
             .where(Payment.id == payment_id)
-            .options(
-                selectinload(Payment.booking),
-                selectinload(Payment.recorded_by),
-            )
+            .options(*self._base_options())
         )
         return result.scalar_one_or_none()
 

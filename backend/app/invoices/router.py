@@ -16,6 +16,7 @@ from app.core.exceptions import (
     BadRequestException,
     NotFoundException,
     UnauthorizedException,
+    ForbiddenException,
 )
 from app.core.pagination import PaginationParams
 from app.core.security import decode_token
@@ -565,3 +566,18 @@ async def update_invoice_status(
     if not invoice:
         raise NotFoundException("Invoice not found.")
     return await repo.update_status(invoice, new_status)
+
+
+@router.delete("/{invoice_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_invoice(
+    invoice_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    repo = InvoiceRepository(db)
+    invoice = await repo.get_by_id(invoice_id)
+    if not invoice:
+        raise NotFoundException("Invoice not found.")
+    if current_user.role.name == "Guest" and invoice.guest_id != current_user.id:
+        raise ForbiddenException("You can only delete your own invoices.")
+    await repo.delete(invoice)

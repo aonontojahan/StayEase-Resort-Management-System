@@ -106,7 +106,7 @@ export const MyBookingsPage: React.FC = () => {
           </a>
         </div>
       ) : (
-        <div className="grid gap-6 sm:grid-cols-2">
+        <div className="grid gap-6 grid-cols-1">
           {bookings.map((b) => {
             const remaining = getRemaining(b)
             const roomNames = b.booking_rooms.map(br => br.room.room_type.name).join(", ")
