@@ -83,14 +83,14 @@ class RoomRepository:
         booked_subq = select(BookingRoom.room_id).where(
             BookingRoom.status.in_([BookingStatus.confirmed, BookingStatus.checked_in]),
             BookingRoom.check_in_date < check_out,
-            BookingRoom.check_out_date > check_in,
+            BookingRoom.check_out_date >= check_in,
         )
         result = await self.db.execute(
             select(Room)
             .options(selectinload(Room.room_type))
             .where(
                 Room.id.notin_(booked_subq),
-                Room.status.in_(["Available", "Cleaning", "Cleaned"]),
+                Room.status != "Maintenance",
             )
             .order_by(Room.room_number)
         )

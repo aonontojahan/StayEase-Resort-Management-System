@@ -95,7 +95,7 @@ class BookingRepository:
                 ]
             ),
             BookingRoom.check_in_date < check_out,
-            BookingRoom.check_out_date > check_in,
+            BookingRoom.check_out_date >= check_in,
         )
         if exclude_booking_id:
             query = query.where(BookingRoom.booking_id != exclude_booking_id)

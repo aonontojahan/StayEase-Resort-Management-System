@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from "react"
 import { useAuth } from "@/store/AuthContext"
-import { apiGet } from "@/services/api"
+import { api, apiGet } from "@/services/api"
 import { OccupancyReport, BookingsSummary, RevenueReport } from "@/types/api"
 import { useWebSocket } from "@/hooks/useWebSocket"
 import { 
   Home, BookOpen, BedDouble, Sparkles, CreditCard, FileText, Menu, X,
-  UserCheck, UserCircle, LogIn, LogOut, Sun, Moon
+  UserCheck, UserCircle, LogIn, LogOut, Loader2, Sun, Moon
 } from "lucide-react"
 
 import { StaffManagement } from "@/components/StaffManagement"
@@ -23,6 +23,7 @@ import { HousekeepingTasksPage } from "@/pages/HousekeepingTasksPage"
 import { StatsGridSkeleton } from "@/components/Skeleton"
 import { UserMenu } from "@/components/UserMenu"
 import { NotificationBell } from "@/components/NotificationBell"
+import { useToast } from "@/components/Toast"
 import { EditProfileModal, SecurityModal } from "@/components/ProfileModals"
 import { useDarkMode } from "@/hooks/useDarkMode"
 import { Badge } from "@/components/ui/Badge"
@@ -39,6 +40,9 @@ export const Dashboard: React.FC = () => {
     window.addEventListener("navigate-tab", handler as EventListener)
     return () => window.removeEventListener("navigate-tab", handler as EventListener)
   }, [])
+  const [todaysArrivals, setTodaysArrivals] = useState<any[]>([])
+  const [todaysDepartures, setTodaysDepartures] = useState<any[]>([])
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [editProfileOpen, setEditProfileOpen] = useState(false)
   const [securityOpen, setSecurityOpen] = useState(false)
 
@@ -49,8 +53,56 @@ export const Dashboard: React.FC = () => {
   const [loadingDashboard, setLoadingDashboard] = useState(false)
 
   const fetchDashboardData = async () => {
-    if (!user || !["Resort Owner", "Manager", "Accountant"].includes(user.role.name)) return
+    if (!user) return
     setLoadingDashboard(true)
+
+    if (user.role.name === "Receptionist") {
+      try {
+        const [roomsRes, bookingsRes] = await Promise.allSettled([
+          apiGet<any[]>("/rooms/"),
+          apiGet<any[]>("/bookings/", { params: { limit: 200 } }),
+        ])
+
+        if (roomsRes.status === "fulfilled") {
+          const rooms = roomsRes.value.data
+          const available = rooms.filter((r: any) => r.status !== "Occupied" && r.status !== "Maintenance").length
+          const occupied = rooms.filter((r: any) => r.status === "Occupied").length
+          const cleaning = rooms.filter((r: any) => r.status === "Cleaning").length
+          const maintenance = rooms.filter((r: any) => r.status === "Maintenance").length
+          setOccupancy({
+            total_rooms: rooms.length,
+            available, occupied, cleaning, maintenance,
+            occupancy_rate: rooms.length ? Math.round((occupied / rooms.length) * 100) : 0,
+          } as OccupancyReport)
+        }
+
+        if (bookingsRes.status === "fulfilled") {
+          const bookings = bookingsRes.value.data
+          const today = new Date().toISOString().split('T')[0]
+          setTodaysArrivals(
+            bookings.filter((b: any) =>
+              b.booking_rooms?.some((br: any) => br.check_in_date === today)
+            )
+          )
+          setTodaysDepartures(
+            bookings.filter((b: any) =>
+              b.booking_rooms?.some((br: any) => br.check_out_date === today)
+            )
+          )
+        }
+      } catch {
+        // silently ignore
+      } finally {
+        setLoadingDashboard(false)
+      }
+      return
+    }
+
+    if (!["Resort Owner", "Manager", "Accountant"].includes(user.role.name)) {
+      setLoadingDashboard(false)
+      return
+    }
+
     try {
       const [occRes, summaryRes, revRes] = await Promise.allSettled([
         apiGet<OccupancyReport>("/reports/occupancy"),
@@ -81,6 +133,34 @@ export const Dashboard: React.FC = () => {
       }
     }
   }, [user, activeTab])
+
+  const { toastSuccess, toastError } = useToast()
+
+  const handleCheckIn = async (booking: any) => {
+    setUpdatingId(booking.id)
+    try {
+      await api.post(`/bookings/${booking.id}/check-in`)
+      toastSuccess(`${booking.guest?.full_name || "Guest"} checked in successfully.`)
+      fetchDashboardData()
+    } catch (err: any) {
+      toastError(err.response?.data?.detail || "Failed to check in.")
+    } finally {
+      setUpdatingId(null)
+    }
+  }
+
+  const handleCheckOut = async (booking: any) => {
+    setUpdatingId(booking.id)
+    try {
+      await api.post(`/bookings/${booking.id}/check-out`)
+      toastSuccess(`${booking.guest?.full_name || "Guest"} checked out successfully.`)
+      fetchDashboardData()
+    } catch (err: any) {
+      toastError(err.response?.data?.detail || "Failed to check out.")
+    } finally {
+      setUpdatingId(null)
+    }
+  }
 
   const { onMessage } = useWebSocket()
 
@@ -193,6 +273,22 @@ export const Dashboard: React.FC = () => {
             <span>Invoices</span>
           </button>
         </>
+      ) : user.role.name === "Receptionist" ? (
+        <>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground px-3 pt-3 pb-1">Front Desk</p>
+          <button onClick={() => handleTabChange("Dashboard")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Dashboard" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
+            <Home className="h-4 w-4" />
+            <span>Dashboard</span>
+          </button>
+          <button onClick={() => handleTabChange("Bookings")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Bookings" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
+            <BookOpen className="h-4 w-4" />
+            <span>Bookings</span>
+          </button>
+          <button onClick={() => handleTabChange("Browse Rooms")} className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === "Browse Rooms" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
+            <BedDouble className="h-4 w-4" />
+            <span>Browse Rooms</span>
+          </button>
+        </>
       ) : null}
 
     </>
@@ -213,6 +309,163 @@ export const Dashboard: React.FC = () => {
       case "Housekeeping Tasks": return <HousekeepingTasksPage />
       case "Dashboard":
       default:
+        // ── Receptionist Dashboard ──
+        if (user.role.name === "Receptionist") {
+          return (
+            <div className="space-y-6">
+              {/* Welcome Header */}
+              <div className="rounded-2xl bg-gradient-to-br from-primary via-primary/95 to-emerald-900 p-6 text-white shadow-xl relative overflow-hidden">
+                <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-emerald-500/10 blur-3xl"></div>
+                <div className="relative z-10 space-y-1">
+                  <h2 className="text-2xl font-bold md:text-3xl font-serif tracking-wide">Front Desk</h2>
+                  <p className="text-emerald-100 text-xs md:text-sm max-w-xl">
+                    {user.full_name}, {user.role.name}
+                  </p>
+                </div>
+              </div>
+
+              {loadingDashboard ? (
+                <StatsGridSkeleton />
+              ) : (
+                <>
+                  {/* Metrics Cards */}
+                  <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                    <div className="rounded-xl border bg-card p-5 shadow-sm space-y-2">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                        <LogIn className="h-3 w-3" /> Today's Arrivals
+                      </p>
+                      <h3 className="text-2xl font-bold text-indigo-600">{todaysArrivals.length}</h3>
+                      <p className="text-[10px] text-muted-foreground">Expected check-ins today</p>
+                    </div>
+
+                    <div className="rounded-xl border bg-card p-5 shadow-sm space-y-2">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                        <LogOut className="h-3 w-3" /> Today's Departures
+                      </p>
+                      <h3 className="text-2xl font-bold text-amber-600">{todaysDepartures.length}</h3>
+                      <p className="text-[10px] text-muted-foreground">Expected check-outs today</p>
+                    </div>
+
+                    <div className="rounded-xl border bg-card p-5 shadow-sm space-y-2">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                        <BedDouble className="h-3 w-3" /> Occupied Rooms
+                      </p>
+                      <h3 className="text-2xl font-bold text-blue-600">{occupancy?.occupied || 0}</h3>
+                      <p className="text-[10px] text-muted-foreground">Currently checked in</p>
+                    </div>
+
+                    <div className="rounded-xl border bg-card p-5 shadow-sm space-y-2">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                        <Home className="h-3 w-3" /> Available Rooms
+                      </p>
+                      <h3 className="text-2xl font-bold text-green-600">{occupancy?.available || 0}</h3>
+                      <p className="text-[10px] text-muted-foreground">Ready for new guests</p>
+                    </div>
+                  </div>
+
+                  {/* Quick Actions */}
+                  <div className="rounded-xl border bg-card p-5 shadow-sm">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4">Quick Actions</h4>
+                    <div className="flex flex-wrap gap-3">
+                      <button onClick={() => setActiveTab("Bookings")} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary/90 transition-all">
+                        <BookOpen className="h-4 w-4" />
+                        Record Walk-in Booking
+                      </button>
+                      <button onClick={() => setActiveTab("Bookings")} className="inline-flex items-center gap-2 rounded-lg border bg-card px-4 py-2 text-sm font-medium shadow-sm hover:bg-secondary transition-all">
+                        View All Bookings
+                      </button>
+                      <button onClick={() => setActiveTab("Browse Rooms")} className="inline-flex items-center gap-2 rounded-lg border bg-card px-4 py-2 text-sm font-medium shadow-sm hover:bg-secondary transition-all">
+                        <BedDouble className="h-4 w-4" />
+                        Browse Rooms
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Today's Arrivals & Departures Lists */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="rounded-xl border bg-card p-5 shadow-sm space-y-3">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                        <LogIn className="h-3 w-3" /> Today's Arrivals
+                      </h4>
+                      {todaysArrivals.length === 0 ? (
+                        <p className="text-xs text-muted-foreground py-4 text-center">No arrivals scheduled today.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {todaysArrivals.slice(0, 5).map((b: any) => (
+                            <div key={b.id} className="flex items-center justify-between rounded-lg bg-muted/50 p-3 text-xs">
+                              <div className="min-w-0 flex-1">
+                                <p className="font-medium truncate">{b.guest?.full_name || "Guest"}</p>
+                                <p className="text-muted-foreground">
+                                  Room {b.booking_rooms?.[0]?.room?.room_number || "—"} · {b.booking_rooms?.[0]?.check_in_date}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0 ml-2">
+                                {updatingId === b.id ? (
+                                  <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                                ) : b.status === "Confirmed" ? (
+                                  <button onClick={() => handleCheckIn(b)} className="rounded-md bg-emerald-600 px-2 py-1 text-[10px] font-semibold text-white hover:bg-emerald-700 transition-colors" title="Check in guest">
+                                    <LogIn className="h-3 w-3 inline mr-0.5" /> Check In
+                                  </button>
+                                ) : (
+                                  <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-medium text-indigo-700 dark:bg-indigo-900 dark:text-indigo-200">
+                                    {b.status}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                          {todaysArrivals.length > 5 && (
+                            <button onClick={() => setActiveTab("Bookings")} className="w-full text-xs text-muted-foreground hover:text-primary text-center transition-colors">+{todaysArrivals.length - 5} more · View All</button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="rounded-xl border bg-card p-5 shadow-sm space-y-3">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                        <LogOut className="h-3 w-3" /> Today's Departures
+                      </h4>
+                      {todaysDepartures.length === 0 ? (
+                        <p className="text-xs text-muted-foreground py-4 text-center">No departures scheduled today.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {todaysDepartures.slice(0, 5).map((b: any) => (
+                            <div key={b.id} className="flex items-center justify-between rounded-lg bg-muted/50 p-3 text-xs">
+                              <div className="min-w-0 flex-1">
+                                <p className="font-medium truncate">{b.guest?.full_name || "Guest"}</p>
+                                <p className="text-muted-foreground">
+                                  Room {b.booking_rooms?.[0]?.room?.room_number || "—"} · {b.booking_rooms?.[0]?.check_out_date}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0 ml-2">
+                                {updatingId === b.id ? (
+                                  <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                                ) : b.status === "CheckedIn" ? (
+                                  <button onClick={() => handleCheckOut(b)} className="rounded-md bg-blue-600 px-2 py-1 text-[10px] font-semibold text-white hover:bg-blue-700 transition-colors" title="Check out guest">
+                                    <LogOut className="h-3 w-3 inline mr-0.5" /> Check Out
+                                  </button>
+                                ) : (
+                                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900 dark:text-amber-200">
+                                    {b.status}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                          {todaysDepartures.length > 5 && (
+                            <button onClick={() => setActiveTab("Bookings")} className="w-full text-xs text-muted-foreground hover:text-primary text-center transition-colors">+{todaysDepartures.length - 5} more · View All</button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )
+        }
+
+        // ── Owner / Manager / Accountant Dashboard ──
         const totalRevenue = revenueReport.reduce((sum, r) => sum + r.revenue, 0)
         const totalTransactions = revenueReport.reduce((sum, r) => sum + r.count, 0)
         return (
@@ -253,7 +506,7 @@ export const Dashboard: React.FC = () => {
                       <h3 className="text-2xl font-bold mt-1 text-blue-600">{bookingsSummary?.Confirmed || 0}</h3>
                     </div>
                     <p className="text-[10px] text-muted-foreground">
-                      {bookingsSummary?.Pending || 0} pending confirmation
+                      Confirmed
                     </p>
                   </div>
 

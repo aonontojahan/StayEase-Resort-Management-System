@@ -207,7 +207,6 @@ export interface OccupancyReport {
 }
 
 export interface BookingsSummary {
-  Pending: number
   Confirmed: number
   CheckedIn: number
   CheckedOut: number
