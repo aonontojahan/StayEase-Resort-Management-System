@@ -426,5 +426,5 @@ async def delete_booking(
     if not is_staff and not is_owner:
         raise ForbiddenException("You cannot delete this booking.")
     if not is_staff and booking.status not in ("Cancelled", "Pending"):
-        raise BadRequestException("You can only delete cancelled or pending bookings.")
+        raise BadRequestException("You can only delete cancelled bookings.")
     await repo.delete(booking)

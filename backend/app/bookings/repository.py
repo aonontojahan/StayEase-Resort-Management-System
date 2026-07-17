@@ -90,7 +90,6 @@ class BookingRepository:
             BookingRoom.room_id == room_id,
             BookingRoom.status.in_(
                 [
-                    BookingStatus.pending,
                     BookingStatus.confirmed,
                     BookingStatus.checked_in,
                 ]
@@ -114,7 +113,7 @@ class BookingRepository:
             guest_id=guest_id,
             created_by_id=created_by_id,
             total_amount=total_amount,
-            status=BookingStatus.pending,
+            status=BookingStatus.confirmed,
         )
         self.db.add(booking)
         await self.db.flush()
@@ -130,7 +129,7 @@ class BookingRepository:
                 special_requests=room_data.special_requests,
                 room_price_per_night=0,
                 total_amount=0,
-                status=BookingStatus.pending,
+                status=BookingStatus.confirmed,
             )
             self.db.add(booking_room)
         await self.db.flush()

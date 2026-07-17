@@ -126,12 +126,10 @@ export const HousekeepingTasksPage: React.FC = () => {
                       value={task.status}
                       onChange={(e) => updateStatus(task, e.target.value)}
                       className={`w-full rounded-lg border py-2 pl-3 pr-8 text-sm font-semibold appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 ${
-                        task.status === "Pending" ? "bg-yellow-50 text-yellow-800" :
                         task.status === "InProgress" ? "bg-blue-50 text-blue-800" :
                         "bg-green-50 text-green-800"
                       }`}
                     >
-                      <option value="Pending">Pending</option>
                       <option value="InProgress">In Progress</option>
                       <option value="Done">Done</option>
                     </select>

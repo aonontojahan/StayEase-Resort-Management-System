@@ -16,7 +16,6 @@ import {
 } from "lucide-react"
 
 const TASK_STATUS_VARIANT: Record<string, "warning" | "info" | "success"> = {
-  Pending: "warning",
   InProgress: "info",
   Done: "success",
 }
@@ -144,11 +143,7 @@ export const HousekeepingPage: React.FC = () => {
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <Sparkles className="h-6 w-6 text-primary" /> Housekeeping
           </h2>
-          <p className="text-sm text-muted-foreground mt-0.5">{tasks.length} total tasks{tasks.filter(t => t.status === "Pending").length > 0 && (
-            <span className="ml-2 inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-semibold text-yellow-800">
-              {tasks.filter(t => t.status === "Pending").length} pending
-            </span>
-          )}
+          <p className="text-sm text-muted-foreground mt-0.5">{tasks.length} total tasks
             {connected && (
               <span className="ml-2 inline-flex items-center gap-1 text-[10px] text-emerald-600 font-medium">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -169,14 +164,13 @@ export const HousekeepingPage: React.FC = () => {
 
       {/* Status pills */}
       <div className="flex flex-wrap gap-3">
-        {["Pending", "InProgress", "Done"].map((s) => (
+        {["InProgress", "Done"].map((s) => (
           <button
             key={s}
             onClick={() => setFilterStatus(filterStatus === s ? "" : s)}
             className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold border transition-all ${
               filterStatus === s
-                ? (s === "Pending" ? "bg-yellow-100 text-yellow-800" :
-                   s === "InProgress" ? "bg-blue-100 text-blue-800" :
+                ? (s === "InProgress" ? "bg-blue-100 text-blue-800" :
                    "bg-green-100 text-green-800") + " border-transparent"
                 : "bg-card border-border text-muted-foreground hover:bg-secondary"
             }`}
@@ -270,7 +264,7 @@ export const HousekeepingPage: React.FC = () => {
                       className="w-full rounded-lg border bg-secondary py-1.5 pl-3 pr-8 text-xs font-medium focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20 appearance-none cursor-pointer"
                     >
                       <option value="" disabled>Change status...</option>
-                      {["Pending", "InProgress", "Done"].filter((s) => s !== task.status).map((s) => (
+                      {["InProgress", "Done"].filter((s) => s !== task.status).map((s) => (
                         <option key={s} value={s}>{s === "InProgress" ? "In Progress" : s}</option>
                       ))}
                     </select>

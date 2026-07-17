@@ -121,7 +121,7 @@ class HousekeepingRepository:
                 select(func.count(HousekeepingTask.id)).where(
                     HousekeepingTask.assigned_to_id == hk_id,
                     HousekeepingTask.status.in_(
-                        [TaskStatus.pending, TaskStatus.in_progress]
+                        [TaskStatus.in_progress]
                     ),
                 )
             )

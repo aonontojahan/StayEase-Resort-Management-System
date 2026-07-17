@@ -6,8 +6,16 @@ import { CreditCard, Loader2, RefreshCw, CalendarDays, Hash, DoorOpen, Banknote 
 
 const STATUS_COLORS: Record<string, string> = {
   Completed: "bg-green-100 text-green-800",
-  Pending: "bg-yellow-100 text-yellow-800",
   Refunded: "bg-red-100 text-red-800",
+}
+
+const METHOD_COLORS: Record<string, string> = {
+  Card: "bg-blue-100 text-blue-800",
+  Cash: "bg-green-100 text-green-800",
+  BankTransfer: "bg-purple-100 text-purple-800",
+  bKash: "bg-pink-100 text-black",
+  Nagad: "bg-orange-100 text-black",
+  Rocket: "bg-red-100 text-black",
 }
 
 function fmt(d: string) {
@@ -108,7 +116,11 @@ export const PaymentHistoryPage: React.FC = () => {
                         {room ? fmt(room.check_out_date) : "—"}
                       </td>
                       <td className="py-3 px-4 font-semibold">TK {p.amount.toFixed(2)}</td>
-                      <td className="py-3 px-4 text-muted-foreground capitalize">{p.payment_method}</td>
+                      <td className="py-3 px-4">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${METHOD_COLORS[p.payment_method] || "bg-gray-100 text-gray-700"}`}>
+                          {p.payment_method}
+                        </span>
+                      </td>
                       <td className="py-3 px-4 text-right">
                         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_COLORS[p.status] || "bg-gray-100 text-gray-700"}`}>
                           {p.status}

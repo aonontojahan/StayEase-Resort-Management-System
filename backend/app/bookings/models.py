@@ -11,7 +11,6 @@ from app.core.database import Base
 
 
 class BookingStatus(str, enum.Enum):
-    pending = "Pending"
     confirmed = "Confirmed"
     checked_in = "CheckedIn"
     checked_out = "CheckedOut"
@@ -35,7 +34,7 @@ class Booking(Base):
     status: Mapped[BookingStatus] = mapped_column(
         SAEnum(BookingStatus, name="bookingstatus"),
         nullable=False,
-        default=BookingStatus.pending,
+        default=BookingStatus.confirmed,
     )
     total_amount: Mapped[float] = mapped_column(
         Numeric(10, 2), nullable=False, default=0
@@ -105,7 +104,7 @@ class BookingRoom(Base):
     status: Mapped[BookingStatus] = mapped_column(
         SAEnum(BookingStatus, name="bookingroomstatus"),
         nullable=False,
-        default=BookingStatus.pending,
+        default=BookingStatus.confirmed,
     )
 
     created_at: Mapped[datetime] = mapped_column(

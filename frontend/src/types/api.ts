@@ -90,7 +90,7 @@ export interface BookingRoomCreate {
 
 export interface Booking {
   id: string
-  status: "Pending" | "Confirmed" | "CheckedIn" | "CheckedOut" | "Cancelled"
+  status: "Confirmed" | "CheckedIn" | "CheckedOut" | "Cancelled"
   total_amount: number
   paid_amount: number
   guest: GuestSimple
@@ -133,7 +133,7 @@ export interface Payment {
   id: string
   amount: number
   payment_method: "Cash" | "Card" | "BankTransfer" | "bKash" | "Nagad" | "Rocket"
-  status: "Pending" | "Completed" | "Refunded" | "CancelledFee"
+  status: "Completed" | "Refunded" | "CancelledFee"
   transaction_ref: string | null
   notes: string | null
   cancellation_fee: number | null
@@ -168,7 +168,7 @@ export interface HousekeepingTask {
   id: string
   title: string
   description: string | null
-  status: "Pending" | "InProgress" | "Done"
+  status: "InProgress" | "Done"
   priority: "Low" | "Medium" | "High"
   due_date: string | null
   completed_at: string | null
@@ -265,7 +265,7 @@ export interface Refund {
   amount: number
   cancellation_fee: number | null
   refund_method: string | null
-  status: "Pending" | "Completed" | "Failed"
+  status: "Completed" | "Failed"
   transaction_ref: string | null
   notes: string | null
   created_at: string
@@ -283,7 +283,6 @@ export interface RevenueSummary {
 }
 
 export interface RefundSummary {
-  pending_count: number
   total_refunded: number
   total_cancellation_fees: number
 }

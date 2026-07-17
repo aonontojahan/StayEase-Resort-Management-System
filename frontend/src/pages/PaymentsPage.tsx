@@ -110,7 +110,6 @@ export const PaymentsPage: React.FC = () => {
 
   const STATUS_COLORS: Record<string, string> = {
     Completed: "bg-green-100 text-green-800",
-    Pending: "bg-yellow-100 text-yellow-800",
     Refunded: "bg-red-100 text-red-800",
     CancelledFee: "bg-purple-100 text-purple-800",
   }
@@ -119,6 +118,9 @@ export const PaymentsPage: React.FC = () => {
     Card: "bg-blue-100 text-blue-800",
     Cash: "bg-green-100 text-green-800",
     BankTransfer: "bg-purple-100 text-purple-800",
+    bKash: "bg-pink-100 text-black",
+    Nagad: "bg-orange-100 text-black",
+    Rocket: "bg-red-100 text-black",
   }
 
   return (

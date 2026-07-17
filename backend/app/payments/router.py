@@ -122,7 +122,7 @@ async def record_payment(
     repo = PaymentRepository(db)
     payment = await repo.create(data, current_user.id)
 
-    if booking.status == BookingStatus.pending:
+    if booking.status == BookingStatus.confirmed:
         room_ids = [br.room_id for br in booking.booking_rooms]
         await booking_repo.update_status(booking, BookingStatus.confirmed)
         room_repo = RoomRepository(db)
@@ -217,7 +217,7 @@ async def pay_via_mobile_banking(
     payment_repo = PaymentRepository(db)
     payment = await payment_repo.create(payment_data, current_user.id)
 
-    if booking.status == BookingStatus.pending:
+    if booking.status == BookingStatus.confirmed:
         room_ids = [br.room_id for br in booking.booking_rooms]
         await booking_repo.update_status(booking, BookingStatus.confirmed)
         room_repo = RoomRepository(db)
@@ -329,7 +329,7 @@ async def pay_via_card(
     payment_repo = PaymentRepository(db)
     payment = await payment_repo.create(payment_data, current_user.id)
 
-    if booking.status == BookingStatus.pending:
+    if booking.status == BookingStatus.confirmed:
         room_ids = [br.room_id for br in booking.booking_rooms]
         await booking_repo.update_status(booking, BookingStatus.confirmed)
         room_repo = RoomRepository(db)

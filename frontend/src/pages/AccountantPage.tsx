@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react"
 import { api, apiGet } from "@/services/api"
-import { Payment, RevenueReport, Refund, RefundSummary } from "@/types/api"
+import { Payment, RevenueReport, Refund, RefundSummary, InvoiceSummary } from "@/types/api"
 import { useToast } from "@/components/Toast"
 import { Modal } from "@/components/Modal"
 import { useForm } from "react-hook-form"
@@ -21,6 +21,19 @@ interface RevenueSummary {
   completed_payments: number
   refunded_payments: number
   cancellation_fees: number
+  actual_refunded: number
+}
+
+interface CancellationFeeMonthly {
+  month: string
+  fees: number
+  count: number
+}
+
+interface CancellationFeeReport {
+  total_fees: number
+  total_cancellations: number
+  monthly: CancellationFeeMonthly[]
 }
 
 // ── Payment form schema ───────────────────────────────────────────────────
@@ -40,11 +53,6 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
     color: "bg-emerald-100 text-emerald-800",
     icon: <CheckCircle2 className="h-3 w-3" />,
   },
-  Pending: {
-    label: "Pending",
-    color: "bg-amber-100 text-amber-800",
-    icon: <Clock className="h-3 w-3" />,
-  },
   Refunded: {
     label: "Refunded",
     color: "bg-red-100 text-red-800",
@@ -62,6 +70,9 @@ const METHOD_CONFIG: Record<string, string> = {
   Card:         "bg-blue-100 text-blue-800",
   Cash:         "bg-green-100 text-green-800",
   BankTransfer: "bg-purple-100 text-purple-800",
+  bKash:        "bg-pink-100 text-black",
+  Nagad:        "bg-orange-100 text-black",
+  Rocket:       "bg-red-100 text-black",
 }
 
 function exportToCSV(payments: Payment[]) {
@@ -104,6 +115,8 @@ export const AccountantPage: React.FC = () => {
   const [refunds, setRefunds]           = useState<Refund[]>([])
   const [refundSummary, setRefundSummary] = useState<RefundSummary | null>(null)
   const [showRefundHistory, setShowRefundHistory] = useState(false)
+  const [invoiceSummary, setInvoiceSummary] = useState<InvoiceSummary | null>(null)
+  const [cancellationFees, setCancellationFees] = useState<CancellationFeeReport | null>(null)
 
   const [search, setSearch]             = useState("")
   const [filterMethod, setFilterMethod] = useState("")
@@ -124,26 +137,35 @@ export const AccountantPage: React.FC = () => {
   // ── Fetch ───────────────────────────────────────────────────────────────
   const fetchData = async () => {
     setLoading(true)
-    try {
-      const [paymentsRes, bookingsRes, summaryRes, revRes, refundRes, refundSumRes] = await Promise.all([
-        apiGet<Payment[]>("/payments/"),
-        apiGet<any[]>("/bookings/"),
-        apiGet<RevenueSummary>("/payments/summary"),
-        apiGet<RevenueReport[]>("/reports/revenue"),
-        apiGet<Refund[]>("/refunds/"),
-        apiGet<RefundSummary>("/refunds/summary"),
-      ])
-      setPayments(paymentsRes.data)
-      setBookings(bookingsRes.data)
-      setSummary(summaryRes.data)
-      setRevenue(revRes.data)
-      setRefunds(refundRes.data)
-      setRefundSummary(refundSumRes.data)
-    } catch {
-      toastError("Failed to load financial data.")
-    } finally {
-      setLoading(false)
+    let hasError = false
+
+    const safeFetch = async <T,>(fn: () => Promise<T>, setter: (v: T) => void, label: string) => {
+      try {
+        const res = await fn()
+        setter(res)
+      } catch (err: any) {
+        hasError = true
+        const status = err?.response?.status
+        const detail = err?.response?.data?.detail || ""
+        console.warn(`[Accountant] Failed to load ${label}${status ? ` (${status})` : ""}: ${detail}`)
+      }
     }
+
+    await Promise.all([
+      safeFetch(() => apiGet<Payment[]>("/payments/").then(r => r.data), setPayments, "payments"),
+      safeFetch(() => apiGet<any[]>("/bookings/").then(r => r.data), setBookings, "bookings"),
+      safeFetch(() => apiGet<RevenueSummary>("/payments/summary").then(r => r.data), setSummary, "revenue summary"),
+      safeFetch(() => apiGet<RevenueReport[]>("/reports/revenue").then(r => r.data), setRevenue, "revenue report"),
+      safeFetch(() => apiGet<Refund[]>("/refunds/").then(r => r.data), setRefunds, "refunds"),
+      safeFetch(() => apiGet<RefundSummary>("/refunds/summary").then(r => r.data), setRefundSummary, "refund summary"),
+      safeFetch(() => apiGet<InvoiceSummary>("/invoices/summary").then(r => r.data), setInvoiceSummary, "invoice summary"),
+      safeFetch(() => apiGet<CancellationFeeReport>("/reports/cancellation-fees").then(r => r.data), setCancellationFees, "cancellation fees"),
+    ])
+
+    if (hasError) {
+      toastError("Some financial data failed to load. Check console for details.")
+    }
+    setLoading(false)
   }
 
   useEffect(() => { fetchData() }, [])
@@ -246,11 +268,6 @@ export const AccountantPage: React.FC = () => {
           >
             <RotateCcw className="h-4 w-4 text-muted-foreground" />
             Refunds
-            {refundSummary && refundSummary.pending_count > 0 && (
-              <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-destructive text-[10px] font-bold text-white">
-                {refundSummary.pending_count}
-              </span>
-            )}
           </button>
           <button
             onClick={() => exportToCSV(filtered)}
@@ -279,16 +296,31 @@ export const AccountantPage: React.FC = () => {
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <div className="rounded-xl border bg-card p-5 shadow-sm space-y-3">
               <div className="flex items-center justify-between">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Gross Revenue</p>
+                <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                  <TrendingUp className="h-4 w-4 text-indigo-600" />
+                </div>
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold text-indigo-600">
+                  TK {(summary?.total_revenue ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </h3>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Total income before deductions</p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border bg-card p-5 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Net Revenue</p>
                 <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center">
-                  <TrendingUp className="h-4 w-4 text-emerald-600" />
+                  <DollarSign className="h-4 w-4 text-emerald-600" />
                 </div>
               </div>
               <div>
                 <h3 className="text-2xl font-bold text-emerald-600">
                   TK {(summary?.net_revenue ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </h3>
-                <p className="text-[10px] text-muted-foreground mt-0.5">After refunds & fees</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Revenue after fees retained</p>
               </div>
             </div>
 
@@ -296,7 +328,7 @@ export const AccountantPage: React.FC = () => {
               <div className="flex items-center justify-between">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Gross Collected</p>
                 <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                  <DollarSign className="h-4 w-4 text-blue-600" />
+                  <CreditCard className="h-4 w-4 text-blue-600" />
                 </div>
               </div>
               <div>
@@ -304,6 +336,21 @@ export const AccountantPage: React.FC = () => {
                   TK {(summary?.completed_payments ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </h3>
                 <p className="text-[10px] text-muted-foreground mt-0.5">{summary?.total_payments ?? 0} completed payments</p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border bg-card p-5 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Cancellation Fees</p>
+                <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center">
+                  <TrendingUp className="h-4 w-4 text-purple-600" />
+                </div>
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold text-purple-600">
+                  TK {(summary?.cancellation_fees ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </h3>
+                <p className="text-[10px] text-muted-foreground mt-0.5">30% fee retained on cancellations</p>
               </div>
             </div>
 
@@ -318,22 +365,22 @@ export const AccountantPage: React.FC = () => {
                 <h3 className="text-2xl font-bold text-red-500">
                   TK {(summary?.refunded_payments ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </h3>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Refunded transactions</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Original refund amounts</p>
               </div>
             </div>
 
             <div className="rounded-xl border bg-card p-5 shadow-sm space-y-3">
               <div className="flex items-center justify-between">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Cancellation Fees</p>
-                <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center">
-                  <TrendingDown className="h-4 w-4 text-purple-600" />
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Actual Paid Out</p>
+                <div className="h-8 w-8 rounded-full bg-orange-100 flex items-center justify-center">
+                  <TrendingDown className="h-4 w-4 text-orange-600" />
                 </div>
               </div>
               <div>
-                <h3 className="text-2xl font-bold text-purple-600">
-                  TK {(summary?.cancellation_fees ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                <h3 className="text-2xl font-bold text-orange-600">
+                  TK {(summary?.actual_refunded ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </h3>
-                <p className="text-[10px] text-muted-foreground mt-0.5">30% fee retained on cancellations</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Net cash refunded (after fees)</p>
               </div>
             </div>
 
@@ -354,29 +401,113 @@ export const AccountantPage: React.FC = () => {
           </div>
 
           {/* Monthly Revenue Breakdown */}
-          {revenue.length > 0 && (
+          <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+            <div className="px-5 py-3.5 border-b bg-muted/20">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <BarChart3 className="h-3.5 w-3.5" /> Monthly Revenue Breakdown
+              </h4>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs text-muted-foreground uppercase bg-muted/30 border-b">
+                  <tr>
+                    <th className="px-5 py-3">Month</th>
+                    <th className="px-5 py-3 text-right">Transactions</th>
+                    <th className="px-5 py-3 text-right">Gross Income</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {revenue.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="px-5 py-8 text-center text-muted-foreground">
+                        <BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                        <p className="font-medium">No revenue data yet</p>
+                        <p className="text-xs mt-0.5">Revenue will appear here once payments are completed.</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    revenue.map((r, i) => (
+                      <tr key={i} className="hover:bg-muted/20 transition-colors">
+                        <td className="px-5 py-3 font-medium">{r.month}</td>
+                        <td className="px-5 py-3 text-right font-mono text-muted-foreground">{r.count}</td>
+                        <td className="px-5 py-3 text-right font-bold text-emerald-600">
+                          TK {r.revenue.toLocaleString()}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Invoice Summary */}
+          {invoiceSummary && (
             <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
               <div className="px-5 py-3.5 border-b bg-muted/20">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  <BarChart3 className="h-3.5 w-3.5" /> Monthly Revenue Breakdown
+                  <FileText className="h-3.5 w-3.5" /> Invoice Summary
                 </h4>
+              </div>
+              <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0">
+                <div className="p-5 text-center">
+                  <p className="text-xs text-muted-foreground">Total Invoices</p>
+                  <p className="text-2xl font-bold mt-1">{invoiceSummary.total_invoices}</p>
+                </div>
+                <div className="p-5 text-center">
+                  <p className="text-xs text-muted-foreground">Paid</p>
+                  <p className="text-2xl font-bold text-emerald-600 mt-1">
+                    TK {invoiceSummary.total_paid.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{invoiceSummary.paid_count} invoices</p>
+                </div>
+                <div className="p-5 text-center">
+                  <p className="text-xs text-muted-foreground">Unpaid / Outstanding</p>
+                  <p className="text-2xl font-bold text-amber-600 mt-1">
+                    TK {invoiceSummary.total_unpaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{invoiceSummary.unpaid_count} invoices</p>
+                </div>
+                <div className="p-5 text-center">
+                  <p className="text-xs text-muted-foreground">Collection Rate</p>
+                  <p className="text-2xl font-bold text-blue-600 mt-1">
+                    {invoiceSummary.total_invoices > 0
+                      ? `${((invoiceSummary.total_paid / (invoiceSummary.total_paid + invoiceSummary.total_unpaid)) * 100).toFixed(1)}%`
+                      : "—"}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Paid vs total collectible</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Cancellation Fee Breakdown */}
+          {cancellationFees && cancellationFees.monthly.length > 0 && (
+            <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+              <div className="px-5 py-3.5 border-b bg-muted/20 flex items-center justify-between">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                  <TrendingDown className="h-3.5 w-3.5" /> Cancellation Fee Breakdown
+                </h4>
+                <span className="text-xs text-muted-foreground">
+                  TK {cancellationFees.total_fees.toLocaleString(undefined, { minimumFractionDigits: 2 })} total · {cancellationFees.total_cancellations} cancellations
+                </span>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
                   <thead className="text-xs text-muted-foreground uppercase bg-muted/30 border-b">
                     <tr>
                       <th className="px-5 py-3">Month</th>
-                      <th className="px-5 py-3 text-right">Transactions</th>
-                      <th className="px-5 py-3 text-right">Gross Income</th>
+                      <th className="px-5 py-3 text-right">Cancellations</th>
+                      <th className="px-5 py-3 text-right">Fees Collected</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {revenue.map((r, i) => (
+                    {cancellationFees.monthly.map((r, i) => (
                       <tr key={i} className="hover:bg-muted/20 transition-colors">
                         <td className="px-5 py-3 font-medium">{r.month}</td>
                         <td className="px-5 py-3 text-right font-mono text-muted-foreground">{r.count}</td>
-                        <td className="px-5 py-3 text-right font-bold text-emerald-600">
-                          TK {r.revenue.toLocaleString()}
+                        <td className="px-5 py-3 text-right font-bold text-purple-600">
+                          TK {r.fees.toLocaleString()}
                         </td>
                       </tr>
                     ))}
@@ -419,6 +550,7 @@ export const AccountantPage: React.FC = () => {
               >
                 <option value="">All Methods</option>
                 <option value="Cash">Cash</option>
+                <option value="Card">Card</option>
                 <option value="bKash">bKash</option>
                 <option value="Nagad">Nagad</option>
                 <option value="Rocket">Rocket</option>
@@ -432,7 +564,6 @@ export const AccountantPage: React.FC = () => {
               >
                 <option value="">All Statuses</option>
                 <option value="Completed">Completed</option>
-                <option value="Pending">Pending</option>
                 <option value="Refunded">Refunded</option>
                 <option value="CancelledFee">Cancelled (Fee)</option>
               </select>
@@ -570,7 +701,7 @@ export const AccountantPage: React.FC = () => {
                 .filter((b) => b.status !== "Cancelled")
                 .map((b) => (
                   <option key={b.id} value={b.id}>
-                    {b.guest?.full_name || b.id.slice(0, 8)} – Room {b.room?.room_number} – TK {b.total_amount}
+                    {b.guest?.full_name || b.id.slice(0, 8)} – Room {b.booking_rooms?.[0]?.room?.room_number ?? "?"} – TK {b.total_amount}
                   </option>
                 ))}
             </select>
@@ -596,9 +727,12 @@ export const AccountantPage: React.FC = () => {
                 {...form.register("payment_method")}
                 className="block w-full rounded-lg border bg-card py-2 px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               >
-                <option>Card</option>
                 <option>Cash</option>
+                <option>Card</option>
                 <option>BankTransfer</option>
+                <option>bKash</option>
+                <option>Nagad</option>
+                <option>Rocket</option>
               </select>
             </div>
           </div>
@@ -724,7 +858,7 @@ export const AccountantPage: React.FC = () => {
       <Modal isOpen={showRefundHistory} title="Refund History" onClose={() => setShowRefundHistory(false)} maxWidth="max-w-4xl">
         <div className="space-y-4 max-h-[70vh] overflow-y-auto">
           {refundSummary && (
-            <div className="grid grid-cols-3 gap-3 pb-3 border-b">
+            <div className="grid grid-cols-2 gap-3 pb-3 border-b">
               <div className="text-center">
                 <p className="text-xs text-muted-foreground">Total Refunded</p>
                 <p className="font-bold text-emerald-600">TK {refundSummary.total_refunded.toFixed(2)}</p>
@@ -732,10 +866,6 @@ export const AccountantPage: React.FC = () => {
               <div className="text-center">
                 <p className="text-xs text-muted-foreground">Fees Retained</p>
                 <p className="font-bold text-purple-600">TK {refundSummary.total_cancellation_fees.toFixed(2)}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-muted-foreground">Pending</p>
-                <p className="font-bold text-amber-600">{refundSummary.pending_count}</p>
               </div>
             </div>
           )}
@@ -763,7 +893,7 @@ export const AccountantPage: React.FC = () => {
                     <td className="px-3 py-2">
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
                         r.status === "Completed" ? "bg-green-100 text-green-800" :
-                        r.status === "Pending" ? "bg-amber-100 text-amber-800" :
+                        r.status === "Failed" ? "bg-red-100 text-red-800" :
                         "bg-red-100 text-red-800"
                       }`}>
                         {r.status}

@@ -60,7 +60,7 @@ class RefundRepository:
         cancellation_fee: float,
         refund_method: str,
         initiated_by_id: uuid.UUID,
-        status: RefundStatus = RefundStatus.pending,
+        status: RefundStatus = RefundStatus.completed,
         notes: Optional[str] = None,
     ) -> Refund:
         refund = Refund(
@@ -110,11 +110,6 @@ class RefundRepository:
         return await self.get_by_id(refund_id)
 
     async def get_summary_stats(self) -> dict:
-        pending_result = await self.db.execute(
-            select(func.count(Refund.id)).where(Refund.status == RefundStatus.pending)
-        )
-        pending_count = int(pending_result.scalar() or 0)
-
         total_refunded_result = await self.db.execute(
             select(func.sum(Refund.amount)).where(
                 Refund.status == RefundStatus.completed
@@ -130,7 +125,6 @@ class RefundRepository:
         total_fees = float(fees_result.scalar() or 0)
 
         return {
-            "pending_count": pending_count,
             "total_refunded": total_refunded,
             "total_cancellation_fees": total_fees,
         }

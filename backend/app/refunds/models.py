@@ -11,7 +11,6 @@ from app.core.database import Base
 
 
 class RefundStatus(str, enum.Enum):
-    pending = "Pending"
     completed = "Completed"
     failed = "Failed"
 
@@ -52,7 +51,7 @@ class Refund(Base):
     status: Mapped[RefundStatus] = mapped_column(
         SAEnum(RefundStatus, name="refundstatus"),
         nullable=False,
-        default=RefundStatus.pending,
+        default=RefundStatus.completed,
     )
     transaction_ref: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

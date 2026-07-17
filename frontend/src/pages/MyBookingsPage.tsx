@@ -10,7 +10,6 @@ import {
 import { TableSkeleton } from "@/components/Skeleton"
 
 const STATUS_COLORS: Record<string, string> = {
-  Pending: "bg-yellow-100 text-yellow-800 border border-yellow-200",
   Confirmed: "bg-emerald-100 text-emerald-800 border border-emerald-200",
   CheckedIn: "bg-blue-100 text-blue-800 border border-blue-200",
   CheckedOut: "bg-gray-100 text-gray-700 border border-gray-200",
@@ -28,7 +27,7 @@ export const MyBookingsPage: React.FC = () => {
     setLoading(true)
     try {
       const res = await apiGet<Booking[]>("/bookings/my")
-      setBookings(res.data.filter(b => b.status !== "Pending"))
+      setBookings(res.data)
     } catch {
       toastError("Failed to load your bookings.")
     } finally {
@@ -167,7 +166,7 @@ export const MyBookingsPage: React.FC = () => {
                 </div>
 
                 <div className="flex items-center justify-between pt-4 border-t mt-4 gap-2">
-                  {(b.status === "Pending" || b.status === "Confirmed") && (
+                  {(b.status === "Confirmed") && (
                     <button
                       onClick={() => setCancelBooking(b)}
                       className="flex items-center justify-center gap-1.5 rounded-lg border border-destructive text-destructive px-3.5 py-2 text-sm font-semibold hover:bg-destructive/5 transition-colors"

@@ -20,7 +20,6 @@ class PaymentMethod(str, enum.Enum):
 
 
 class PaymentStatus(str, enum.Enum):
-    pending = "Pending"
     completed = "Completed"
     refunded = "Refunded"
 

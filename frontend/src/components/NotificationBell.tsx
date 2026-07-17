@@ -57,7 +57,7 @@ function bookingToNotification(b: Booking): Notification {
     CheckedOut: "Checked Out",
     Cancelled: "Cancelled",
   }
-  const isAlert = b.status === "Pending"
+  const isAlert = false
   return {
     id: `booking-${b.id}`,
     type: isAlert ? "alert" : "booking",

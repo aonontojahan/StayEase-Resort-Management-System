@@ -17,16 +17,14 @@ import {
 } from "lucide-react"
 
 const STATUS_COLORS: Record<string, string> = {
-  Pending: "bg-yellow-100 text-yellow-800",
   Confirmed: "bg-blue-100 text-blue-800",
   CheckedIn: "bg-green-100 text-green-800",
   CheckedOut: "bg-gray-100 text-gray-700",
   Cancelled: "bg-red-100 text-red-800",
 }
 
-const STATUS_OPTIONS = ["Pending", "Confirmed", "CheckedIn", "CheckedOut", "Cancelled"]
+const STATUS_OPTIONS = ["Confirmed", "CheckedIn", "CheckedOut", "Cancelled"]
 const STATUS_TRANSITIONS: Record<string, string[]> = {
-  Pending: ["Confirmed", "Cancelled"],
   Confirmed: ["Cancelled"],
   CheckedIn: ["Cancelled"],
   CheckedOut: [],
@@ -57,6 +55,8 @@ export const BookingsPage: React.FC = () => {
   const [walkinGuestsCount, setWalkinGuestsCount] = useState(1)
   const [walkinSubmitting, setWalkinSubmitting] = useState(false)
   const [walkinCreateNew, setWalkinCreateNew] = useState(false)
+  const [walkinPaymentMethod, setWalkinPaymentMethod] = useState<string>("Cash")
+  const [walkinTransactionRef, setWalkinTransactionRef] = useState("")
 
   const [page, setPage] = useState(1)
   const [itemsPerPage] = useState(10)
@@ -145,6 +145,8 @@ export const BookingsPage: React.FC = () => {
     setWalkinRoomId("")
     setWalkinGuestsCount(1)
     setWalkinCreateNew(false)
+    setWalkinPaymentMethod("Cash")
+    setWalkinTransactionRef("")
 
     try {
       const res = await api.get<Room[]>("/rooms")
@@ -190,7 +192,7 @@ export const BookingsPage: React.FC = () => {
           full_name: walkinGuestName.trim(),
           email: walkinGuestEmail.trim(),
           phone_number: walkinGuestPhone.trim() || undefined,
-          password: import.meta.env.VITE_DEFAULT_GUEST_PASSWORD,
+          password: import.meta.env.VITE_DEFAULT_GUEST_PASSWORD || "Guest@123",
           role_name: "Guest",
         })
         guestId = createRes.data.id
@@ -214,12 +216,16 @@ export const BookingsPage: React.FC = () => {
       const newBooking = bookingRes.data
 
       // Collect full payment at booking time
-      await api.post("/payments/", {
+      const paymentPayload: Record<string, any> = {
         booking_id: newBooking.id,
         amount: newBooking.total_amount,
-        payment_method: "Cash",
-        notes: "Walk-in full payment at booking",
-      })
+        payment_method: walkinPaymentMethod,
+        notes: `Walk-in full payment via ${walkinPaymentMethod}`,
+      }
+      if (walkinTransactionRef.trim()) {
+        paymentPayload.transaction_ref = walkinTransactionRef.trim()
+      }
+      await api.post("/payments/", paymentPayload)
 
       toastSuccess("Walk-in booking created with full payment.")
       setShowWalkin(false)
@@ -503,7 +509,7 @@ export const BookingsPage: React.FC = () => {
             <select value={walkinRoomId} onChange={(e) => setWalkinRoomId(e.target.value)} className="block w-full rounded-lg border bg-card py-2 px-3 text-sm">
               <option value="">-- Select available room --</option>
               {walkinRooms.map((r) => (
-                <option key={r.id} value={r.id}>{r.room_number} - {r.room_type.name} (TK {r.room_type.base_price_per_night}/night)</option>
+                <option key={r.id} value={r.id}>{r.room_number} - {r.room_type?.name ?? "Unknown"} (TK {r.room_type?.base_price_per_night ?? "?"}/night)</option>
               ))}
             </select>
           </div>
@@ -524,6 +530,38 @@ export const BookingsPage: React.FC = () => {
           <div className="space-y-1">
             <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1"><Users className="h-3 w-3" /> Number of Guests</label>
             <input type="number" min={1} value={walkinGuestsCount} onChange={(e) => setWalkinGuestsCount(parseInt(e.target.value) || 1)} className="block w-full rounded-lg border bg-card py-2 px-3 text-sm" />
+          </div>
+
+          {/* Payment Method */}
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-muted-foreground">Payment Method</label>
+            <div className="grid grid-cols-5 gap-1.5">
+              {["Cash", "Card", "bKash", "Nagad", "Rocket"].map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setWalkinPaymentMethod(m)}
+                  className={`rounded-lg border px-2 py-1.5 text-xs font-semibold transition-all ${
+                    walkinPaymentMethod === m
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-card text-muted-foreground border-border hover:bg-secondary"
+                  }`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+            {(walkinPaymentMethod === "bKash" || walkinPaymentMethod === "Nagad" || walkinPaymentMethod === "Rocket") && (
+              <div className="space-y-1">
+                <label className="text-[10px] font-semibold text-muted-foreground">Transaction Reference (send number)</label>
+                <input
+                  value={walkinTransactionRef}
+                  onChange={(e) => setWalkinTransactionRef(e.target.value)}
+                  placeholder="e.g. 01XXXXXXXXX"
+                  className="block w-full rounded-lg border bg-card py-1.5 px-2.5 text-sm"
+                />
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end gap-3 pt-2 border-t">

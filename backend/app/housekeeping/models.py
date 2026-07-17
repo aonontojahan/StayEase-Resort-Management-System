@@ -11,7 +11,6 @@ from app.core.database import Base
 
 
 class TaskStatus(str, enum.Enum):
-    pending = "Pending"
     in_progress = "InProgress"
     done = "Done"
 
@@ -33,7 +32,7 @@ class HousekeepingTask(Base):
 
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    status: Mapped[TaskStatus] = mapped_column(SAEnum(TaskStatus, name="taskstatus"), nullable=False, default=TaskStatus.pending)
+    status: Mapped[TaskStatus] = mapped_column(SAEnum(TaskStatus, name="taskstatus"), nullable=False, default=TaskStatus.in_progress)
     priority: Mapped[TaskPriority] = mapped_column(SAEnum(TaskPriority, name="taskpriority"), nullable=False, default=TaskPriority.medium)
     due_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

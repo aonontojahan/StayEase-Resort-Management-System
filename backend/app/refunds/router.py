@@ -83,21 +83,9 @@ async def initiate_refund(
         total_paid * settings.CANCELLATION_FEE_PERCENTAGE,
         refund_amount,
     )
-    refund_status = RefundStatus.pending
-    transaction_ref = None
+    refund_status = RefundStatus.completed
+    transaction_ref = f"{refund_method.lower()}_ref_{uuid.uuid4().hex[:8]}" if refund_method else f"ref_{uuid.uuid4().hex[:8]}"
     error_msg = None
-
-    if refund_method == "Cash":
-        refund_status = RefundStatus.completed
-        transaction_ref = f"cash_ref_{uuid.uuid4().hex[:8]}"
-    elif refund_method in ("bKash", "Nagad", "Rocket", "BankTransfer"):
-        if payment.transaction_ref:
-            transaction_ref = f"{refund_method.lower()}_ref_{uuid.uuid4().hex[:8]}"
-            refund_status = RefundStatus.completed
-        else:
-            refund_status = RefundStatus.pending
-    else:
-        refund_status = RefundStatus.pending
 
     refund = await refund_repo.create(
         payment_id=body.payment_id,
@@ -175,8 +163,8 @@ async def complete_refund(
     refund = await repo.get_by_id(refund_id)
     if not refund:
         raise NotFoundException("Refund not found.")
-    if refund.status != RefundStatus.pending.value:
-        raise BadRequestException("Only pending refunds can be completed.")
+    if refund.status == RefundStatus.failed.value:
+        raise BadRequestException("Cannot complete a failed refund.")
 
     result = await repo.complete(refund_id, body.transaction_ref, body.notes)
 
