@@ -10,7 +10,7 @@ import {
   CreditCard, Plus, Loader2, RefreshCw, Search,
   TrendingUp, TrendingDown, DollarSign, BarChart3,
   Download, RotateCcw, Filter, Calendar, AlertCircle,
-  CheckCircle2, Clock, XCircle, FileText,
+  CheckCircle2, XCircle, FileText,
 } from "lucide-react"
 
 // ── Types ─────────────────────────────────────────────────────────────────

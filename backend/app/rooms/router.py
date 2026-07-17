@@ -38,6 +38,14 @@ async def public_room_count(
     return {"total_rooms": count}
 
 
+@router.get("/rooms/public/types", response_model=List[RoomTypeRead])
+async def public_room_types(
+    db: AsyncSession = Depends(get_db),
+):
+    repo = RoomTypeRepository(db)
+    return await repo.get_all()
+
+
 @router.get("/room-types", response_model=List[RoomTypeRead])
 async def list_room_types(
     _: User = Depends(get_current_user),

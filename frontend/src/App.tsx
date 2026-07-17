@@ -12,6 +12,10 @@ import { Dashboard } from "@/pages/Dashboard"
 import { ForgotPasswordPage } from "@/pages/ForgotPasswordPage"
 import { ResetPasswordPage } from "@/pages/ResetPasswordPage"
 import { VerifyEmailPage } from "@/pages/VerifyEmailPage"
+import { FAQPage } from "@/pages/FAQPage"
+import { PrivacyPolicyPage } from "@/pages/PrivacyPolicyPage"
+import { TermsOfServicePage } from "@/pages/TermsOfServicePage"
+import { CancellationPolicyPage } from "@/pages/CancellationPolicyPage"
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -44,8 +48,12 @@ export const App: React.FC = () => {
                   <Route path="/dashboard" element={<Dashboard />} />
                 </Route>
 
-                {/* Public landing page */}
+                {/* Public pages */}
                 <Route path="/" element={<LandingPage />} />
+                <Route path="/faq" element={<FAQPage />} />
+                <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+                <Route path="/terms-of-service" element={<TermsOfServicePage />} />
+                <Route path="/cancellation-policy" element={<CancellationPolicyPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </ErrorBoundary>
