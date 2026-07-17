@@ -33,7 +33,7 @@ const faqs = [
   },
   {
     q: "What activities can guests enjoy at the resort?",
-    a: "Guests can enjoy the swimming pool, spa & wellness centre, tea garden tours, hill trekking, bonfire nights, and guided tours to nearby attractions including Madhabkunda and Bichanakandi.",
+    a: "Guests can enjoy the swimming pool, tea garden tours, hill trekking, bonfire nights, and guided tours to nearby attractions including Madhabkunda and Bichanakandi.",
   },
 ]
 

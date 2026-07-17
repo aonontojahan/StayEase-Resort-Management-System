@@ -25,11 +25,22 @@ const sections = [
   },
   {
     title: "Contact Us",
-    content: 'If you have any questions about this Privacy Policy, please contact us at privacy@stayease.com or call +880 1234-567890.',
+    content: "If you have any questions about this Privacy Policy, please contact us at privacy@stayease.com or call +880 1234-567890.",
   },
 ]
 
 export const PrivacyPage: React.FC = () => {
+  const [openSet, setOpenSet] = React.useState<Set<number>>(new Set())
+
+  const toggle = (i: number) => {
+    setOpenSet((prev) => {
+      const next = new Set(prev)
+      if (next.has(i)) next.delete(i)
+      else next.add(i)
+      return next
+    })
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <div className="relative h-[40vh] overflow-hidden">
@@ -50,11 +61,19 @@ export const PrivacyPage: React.FC = () => {
           <Link to="/" className="inline-flex items-center gap-1 text-sm text-emerald-600 hover:text-emerald-700 transition-colors mb-6">
             <ChevronRight className="h-4 w-4 rotate-180" /> Back to Home
           </Link>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {sections.map((section, i) => (
-              <div key={i} className="rounded-2xl bg-white border border-gray-100 shadow-sm p-6 self-start">
-                <h3 className="text-sm font-semibold text-gray-900 mb-2">{section.title}</h3>
-                <p className="text-sm text-gray-600 leading-relaxed">{section.content}</p>
+              <div key={i} className="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden transition-all self-start">
+                <button
+                  onClick={() => toggle(i)}
+                  className="flex w-full items-center justify-between px-5 py-4 text-left text-sm font-semibold text-gray-900 hover:bg-gray-50 transition-colors"
+                >
+                  <span className="flex-1">{section.title}</span>
+                  <ChevronRight className={`h-4 w-4 text-gray-400 transition-transform duration-200 shrink-0 ml-3 ${openSet.has(i) ? "rotate-90" : ""}`} />
+                </button>
+                {openSet.has(i) && (
+                  <div className="px-5 pb-4 text-sm text-gray-600 leading-relaxed">{section.content}</div>
+                )}
               </div>
             ))}
           </div>

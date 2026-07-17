@@ -22,38 +22,44 @@ const features = [
     image: "https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?q=80&w=600&auto=format",
     title: "Swimming Pool",
     description: "Temperature-controlled outdoor pool with children's section, poolside loungers, and shisha lounge.",
+    icon: "🌊",
   },
   {
     image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=600&auto=format",
     title: "Panorama Restaurant",
     description: "Multi-cuisine restaurant serving authentic Sylheti dishes, Bengali, Indian, Chinese, and Continental cuisine.",
+    icon: "🍽",
   },
   {
     image: "https://images.unsplash.com/photo-1556679343-c7306c1976bc?q=80&w=600&auto=format",
     title: "The Tea Lounge",
     description: "Premium seven-colour tea, freshly brewed coffee, and light snacks overlooking the lush green hills.",
+    icon: "🍵",
   },
   {
     image: "https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?q=80&w=600&auto=format",
     title: "Tea Garden Tours",
     description: "Guided tours of nearby tea estates — witness tea plucking, processing, and enjoy fresh Sylheti tea.",
+    icon: "🌿",
   },
   {
-    image: "https://images.unsplash.com/photo-1551632811-561732d1e306?q=80&w=600&auto=format",
+    image: "https://images.unsplash.com/photo-1739524540015-bec48533f9a9?q=80&w=600&auto=format",
     title: "Hill Trekking",
     description: "Organized treks to Madhabkunda, Bichanakandi, and the lush forests of Moulovibazar.",
+    icon: "⛰",
   },
   {
     image: "https://images.unsplash.com/photo-1478131143081-80f7f84ca84d?q=80&w=600&auto=format",
     title: "Bonfire & BBQ Nights",
     description: "Weekly live BBQ dinners with bonfire, traditional music, and starlit dining in the garden courtyard.",
+    icon: "🔥",
   },
 ]
 
 const testimonials = [
   { name: "Rafiqul Islam", location: "Dhaka", text: "Waking up to the misty hills and calm lake was surreal. The staff decorated our room with flowers without asking. Truly world-class.", rating: 5 },
   { name: "Sarah Thompson", location: "London, UK", text: "The Presidential Suite was stunning, the food exceptional, and the tea garden tour was a highlight. Rivals any five-star resort I've been to.", rating: 5 },
-  { name: "Shahriar & Tanya Khan", location: "Chittagong", text: "Our family loved the pool and bonfire night, while we enjoyed the spa. The staff were incredibly warm. Coming back every year.", rating: 5 },
+  { name: "Shahriar & Tanya Khan", location: "Chittagong", text: "Our family loved the pool and bonfire night. The staff were incredibly warm. Coming back every year.", rating: 5 },
   { name: "Priya Nair", location: "Mumbai, India", text: "Spotlessly clean, comfortable bed, garden view — perfect weekend getaway. The seven-colour tea at The Tea Lounge is a must-try.", rating: 5 },
   { name: "Mohammad Ali", location: "Sylhet", text: "Didn't think I needed a staycation — but StayEase changed my mind. The BBQ night by the bonfire was unforgettable.", rating: 5 },
   { name: "Emily & James Cooper", location: "Sydney, Australia", text: "Every staff member knew our names, the food was incredible, the tea garden views breathtaking. A hidden gem in Moulovibazar.", rating: 5 },
@@ -144,7 +150,7 @@ export const LandingPage: React.FC = () => {
     <div className="min-h-screen bg-background font-sans">
       {/* ─── NAVBAR ───────────────────────────────────────────── */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-lg border-b border-white/20 shadow-sm">
-        <div className="flex w-full items-center justify-between px-5 py-3">
+        <div className="flex w-full items-center justify-between px-8 sm:px-12 lg:px-16 py-3">
           <Link to="/" className="flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-700 shadow-sm">
               <svg className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -277,7 +283,7 @@ export const LandingPage: React.FC = () => {
                   Founded in 2010, StayEase Resort brings world-class hospitality to the heart of Sylhet's tea country — Moulovibazar. What began as a boutique property has grown into a {roomCount ? `${roomCount}-room` : "multi-room"} award-winning resort spread across 12 acres of landscaped gardens and natural woodlands.
                 </p>
                 <p className="text-base leading-relaxed text-emerald-100/85">
-                  We offer multiple accommodation categories, two restaurants, a tea lounge, full-service spa, temperature-controlled pool, and a dedicated events pavilion. Certified by the Bangladesh Tourism Board.
+                  We offer multiple accommodation categories, two restaurants, a tea lounge, temperature-controlled pool, and a dedicated events pavilion. Certified by the Bangladesh Tourism Board.
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -314,33 +320,73 @@ export const LandingPage: React.FC = () => {
             </div>
           </div>
         </div>
-        <div className="bg-white py-14 sm:py-20">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="grid gap-6 md:grid-cols-3">
-              {dbRoomTypes.length > 0 ? dbRoomTypes.slice(0, 3).map((room) => (
-                <div key={room.name} className="group rounded-2xl bg-white shadow-md hover:shadow-xl border border-gray-100 overflow-hidden transition-all duration-300">
-                  <div className="relative h-52 overflow-hidden">
-                    <img src={room.image} alt={room.name} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-                    <div className="absolute top-3 right-3 rounded-full bg-white/95 px-3 py-1 text-sm font-bold text-emerald-700 shadow-sm">
-                      {room.price}<span className="text-xs font-normal text-gray-400"> / night</span>
+        <div className="relative bg-gradient-to-b from-white via-emerald-50/20 to-white py-16 sm:py-24 overflow-hidden">
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute top-0 right-0 h-96 w-96 rounded-full bg-emerald-100/30 blur-3xl" />
+            <div className="absolute bottom-0 left-0 h-96 w-96 rounded-full bg-amber-100/20 blur-3xl" />
+            <div className="absolute top-1/2 left-1/3 h-48 w-48 rounded-full bg-emerald-50/40 blur-3xl" />
+          </div>
+          <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="grid gap-8 md:grid-cols-3">
+              {dbRoomTypes.length > 0 ? dbRoomTypes.slice(0, 3).map((room, i) => (
+                <div key={room.name}
+                  className="group relative rounded-2xl bg-white/90 backdrop-blur-sm shadow-[0_8px_30px_rgb(0_0_0_/_0.06)] hover:shadow-[0_20px_60px_rgb(5_150_105_/_0.12)] border border-emerald-100/30 overflow-hidden transition-all duration-500 hover:-translate-y-2"
+                  style={{ animationDelay: `${i * 120}ms` }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/0 via-emerald-50/0 to-amber-50/0 group-hover:via-emerald-50/20 group-hover:to-amber-50/30 opacity-0 group-hover:opacity-100 transition-all duration-700" />
+                  <div className="absolute top-0 left-0 right-0 z-10 h-0.5 bg-gradient-to-r from-emerald-500 via-emerald-400 to-amber-300 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                  <div className="relative h-56 overflow-hidden">
+                    <img src={room.image} alt={room.name} className="h-full w-full object-cover transition-all duration-700 group-hover:scale-110 group-hover:rotate-[0.5deg]" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-900/10 via-transparent to-amber-900/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+                    <div className="absolute top-3 right-3">
+                      <div className="rounded-xl bg-white/90 backdrop-blur-sm px-3.5 py-1.5 shadow-lg ring-1 ring-white/20">
+                        <p className="text-sm font-bold text-emerald-700 leading-none">{room.price}</p>
+                        <p className="text-[9px] font-medium text-gray-400 uppercase tracking-wider">per night</p>
+                      </div>
+                    </div>
+                    <div className="absolute bottom-0 left-0 right-0 p-6">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md shadow-lg ring-1 ring-white/20">
+                          <svg className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                            <polyline points="9 22 9 12 15 12 15 22" />
+                          </svg>
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-bold text-white drop-shadow-lg tracking-tight">{room.name}</h3>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div className="p-5 space-y-3">
-                    <div>
-                      <h3 className="text-lg font-bold text-gray-900">{room.name}</h3>
-                      <p className="text-xs text-gray-400 mt-0.5">{room.size} · {room.capacity}</p>
+                  <div className="relative px-6 pb-6 pt-5">
+                    <div className="absolute top-0 left-6 right-6 h-px bg-gradient-to-r from-emerald-200/0 via-emerald-300/50 to-emerald-200/0" />
+                    <div className="flex items-center gap-1.5 mb-3">
+                      <span className="h-1 w-6 rounded-full bg-gradient-to-r from-emerald-400 to-emerald-300" />
+                      <span className="h-1 w-2 rounded-full bg-amber-300" />
                     </div>
-                    <p className="text-sm text-gray-500 leading-relaxed line-clamp-2">{room.description}</p>
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex items-center gap-3 text-xs text-gray-400 mb-3">
+                      {room.size && (
+                        <span className="flex items-center gap-1">
+                          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18" /></svg>
+                          {room.size}
+                        </span>
+                      )}
+                      <span className="flex items-center gap-1">
+                        <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" /></svg>
+                        {room.capacity}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-500 leading-relaxed line-clamp-2 group-hover:text-gray-600 transition-colors duration-300">{room.description}</p>
+                    <div className="flex flex-wrap gap-1.5 mt-3">
                       {room.perks.slice(0, 3).map((perk) => (
-                        <span key={perk} className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-600">
-                          <Check className="h-2.5 w-2.5" /> {perk}
+                        <span key={perk} className="inline-flex items-center gap-1 rounded-lg bg-emerald-50/80 px-2.5 py-1 text-[11px] font-medium text-emerald-700 ring-1 ring-emerald-100/50">
+                          <Check className="h-2.5 w-2.5 text-emerald-500" /> {perk}
                         </span>
                       ))}
                     </div>
-                    <Link to="/register" className="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-emerald-500 hover:shadow-md active:scale-[0.98]">
-                      Book Now <ArrowUpRight className="h-3.5 w-3.5" />
+                    <Link to="/register" className="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-emerald-500 hover:shadow-md active:scale-[0.97] group/btn">
+                      Book Now <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5" />
                     </Link>
                   </div>
                 </div>
@@ -368,18 +414,43 @@ export const LandingPage: React.FC = () => {
             </div>
           </div>
         </div>
-        <div className="bg-gray-50 py-14 sm:py-20">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {features.map((feature) => (
-                <div key={feature.title} className="group rounded-2xl bg-white shadow-md hover:shadow-xl border border-gray-100 overflow-hidden transition-all duration-300">
-                  <div className="relative h-48 overflow-hidden">
-                    <img src={feature.image} alt={feature.title} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+        <div className="relative bg-gradient-to-b from-gray-50 via-white to-emerald-50/30 py-16 sm:py-24 overflow-hidden">
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-emerald-100/40 blur-3xl" />
+            <div className="absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-amber-100/30 blur-3xl" />
+            <div className="absolute top-1/3 left-1/4 h-48 w-48 rounded-full bg-emerald-50/50 blur-3xl" />
+          </div>
+          <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+              {features.map((feature, i) => (
+                <div key={feature.title}
+                  className="group relative rounded-2xl bg-white/80 backdrop-blur-sm shadow-[0_8px_30px_rgb(0_0_0_/_0.06)] hover:shadow-[0_20px_60px_rgb(5_150_105_/_0.12)] border border-emerald-100/40 overflow-hidden transition-all duration-500 hover:-translate-y-2"
+                  style={{ animationDelay: `${i * 100}ms` }}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/0 via-emerald-50/0 to-emerald-50/0 group-hover:via-emerald-50/30 group-hover:to-emerald-100/40 opacity-0 group-hover:opacity-100 transition-all duration-700" />
+                  <div className="absolute top-0 left-0 right-0 z-10 h-0.5 bg-gradient-to-r from-emerald-500 via-emerald-400 to-amber-300 translate-y-0 group-hover:translate-y-0 transition-transform duration-500" style={{ boxShadow: '0 0 20px rgba(5,150,105,0.3)' }} />
+                  <div className="relative h-56 overflow-hidden">
+                    <img src={feature.image} alt={feature.title} className="h-full w-full object-cover transition-all duration-700 group-hover:scale-110 group-hover:rotate-[0.5deg]" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-900/10 via-transparent to-amber-900/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+                    <div className="absolute bottom-0 left-0 right-0 p-6">
+                      <div className="flex items-center gap-3">
+                        <span className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-white/20 backdrop-blur-md text-lg shadow-lg ring-1 ring-white/20 group-hover:bg-white/30 transition-all duration-300">
+                          {feature.icon}
+                        </span>
+                        <div>
+                          <h3 className="text-lg font-bold text-white drop-shadow-lg tracking-tight">{feature.title}</h3>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="p-5">
-                    <h3 className="text-lg font-bold text-gray-900">{feature.title}</h3>
-                    <p className="mt-2 text-sm text-gray-500 leading-relaxed">{feature.description}</p>
+                  <div className="relative px-6 pb-6 pt-5">
+                    <div className="absolute top-0 left-6 right-6 h-px bg-gradient-to-r from-emerald-200/0 via-emerald-300/50 to-emerald-200/0" />
+                    <div className="flex items-center gap-1.5 mb-2.5">
+                      <span className="h-1 w-6 rounded-full bg-gradient-to-r from-emerald-400 to-emerald-300" />
+                      <span className="h-1 w-2 rounded-full bg-amber-300" />
+                    </div>
+                    <p className="text-sm text-gray-500 leading-relaxed group-hover:text-gray-600 transition-colors duration-300">{feature.description}</p>
                   </div>
                 </div>
               ))}
