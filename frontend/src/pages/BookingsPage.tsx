@@ -150,11 +150,30 @@ export const BookingsPage: React.FC = () => {
 
     try {
       const res = await api.get<Room[]>("/rooms")
-      setWalkinRooms(res.data.filter((r) => r.status === "Available" || r.status === "Cleaning"))
+      setWalkinRooms(res.data.filter((r) => r.status !== "Maintenance"))
     } catch {
       toastError("Failed to load available rooms for walk-in.")
     }
   }
+
+  const fetchWalkinAvailableRooms = async (checkIn: string, checkOut: string) => {
+    if (!checkIn || !checkOut) return
+    try {
+      const res = await api.get<Room[]>("/rooms/available", {
+        params: { check_in: checkIn, check_out: checkOut },
+      })
+      setWalkinRooms(res.data)
+    } catch {
+      const res = await api.get<Room[]>("/rooms")
+      setWalkinRooms(res.data.filter((r) => r.status !== "Maintenance"))
+    }
+  }
+
+  useEffect(() => {
+    if (showWalkin && walkinCheckIn && walkinCheckOut) {
+      fetchWalkinAvailableRooms(walkinCheckIn, walkinCheckOut)
+    }
+  }, [showWalkin, walkinCheckIn, walkinCheckOut])
 
   const searchWalkinGuests = async (q: string) => {
     setWalkinGuestSearch(q)
