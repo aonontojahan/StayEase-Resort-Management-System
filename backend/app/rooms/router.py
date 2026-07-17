@@ -29,6 +29,15 @@ from app.rooms.schemas import (
 router = APIRouter(tags=["Rooms"])
 
 
+@router.get("/rooms/public/count")
+async def public_room_count(
+    db: AsyncSession = Depends(get_db),
+):
+    repo = RoomRepository(db)
+    count = await repo.count_all()
+    return {"total_rooms": count}
+
+
 @router.get("/room-types", response_model=List[RoomTypeRead])
 async def list_room_types(
     _: User = Depends(get_current_user),
