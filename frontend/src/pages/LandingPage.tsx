@@ -68,8 +68,16 @@ const footerSections = [
   },
 ]
 
+const heroImages = [
+  "https://images.unsplash.com/photo-1571896349842-33c89424de2d?q=80&w=2080&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=2070&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1540541338287-41700207dee6?q=80&w=2070&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1596394516093-501ba68a0ba6?q=80&w=2070&auto=format&fit=crop",
+]
+
 export const LandingPage: React.FC = () => {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [activeImage, setActiveImage] = useState(0)
 
   const scrollTo = (id: string) => {
     setMenuOpen(false)
@@ -149,9 +157,12 @@ export const LandingPage: React.FC = () => {
 
       {/* ─── HERO SECTION ─────────────────────────────────────── */}
       <section id="hero" className="relative min-h-screen flex items-center overflow-hidden pt-16">
-        <div className="absolute inset-0 z-0">
-          <img src="https://images.unsplash.com/photo-1571896349842-33c89424de2d?q=80&w=2080&auto=format&fit=crop"
-            alt="Luxury Resort" className="h-full w-full object-cover" />
+        <div className="absolute inset-0 z-0 transition-all duration-700">
+          {heroImages.map((src, i) => (
+            <img key={i} src={src} alt="Luxury Resort"
+              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${i === activeImage ? "opacity-100" : "opacity-0"}`}
+            />
+          ))}
           <div className="absolute inset-0 bg-gradient-to-r from-emerald-950/95 via-emerald-950/80 to-emerald-950/40" />
         </div>
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20">
@@ -197,11 +208,21 @@ export const LandingPage: React.FC = () => {
             </div>
           </div>
         </div>
-        {/* Scroll indicator */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 animate-bounce">
-          <div className="h-10 w-6 rounded-full border-2 border-white/40 flex items-start justify-center pt-2">
-            <div className="h-2 w-1 rounded-full bg-white/70" />
-          </div>
+        {/* Image thumbnails */}
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex gap-3">
+          {heroImages.map((src, i) => (
+            <button
+              key={i}
+              onMouseEnter={() => setActiveImage(i)}
+              className={`group relative h-14 w-20 overflow-hidden rounded-lg border-2 transition-all duration-300 ${
+                i === activeImage
+                  ? "border-white scale-110 shadow-lg"
+                  : "border-white/30 opacity-60 hover:opacity-100 hover:border-white/60"
+              }`}
+            >
+              <img src={src} alt={`View ${i + 1}`} className="h-full w-full object-cover" />
+            </button>
+          ))}
         </div>
       </section>
 
