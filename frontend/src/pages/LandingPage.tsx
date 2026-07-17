@@ -78,7 +78,6 @@ const footerSections = [
   {
     title: "Experiences",
     links: [
-      { label: "Spa & Wellness", href: "#amenities" },
       { label: "Tea Garden Tours", href: "#amenities" },
       { label: "Hill Trekking", href: "#amenities" },
       { label: "Weddings & Events", href: "#" },

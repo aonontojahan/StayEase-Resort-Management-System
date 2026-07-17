@@ -19,7 +19,7 @@ export const Login: React.FC = () => {
   const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
-  
+
   const {
     register,
     handleSubmit,
@@ -35,7 +35,6 @@ export const Login: React.FC = () => {
       await login(data)
       navigate("/dashboard")
     } catch (err: any) {
-      console.error("Login error:", err)
       if (err.response) {
         const status = err.response.status
         const detail = err.response.data?.detail
@@ -49,82 +48,69 @@ export const Login: React.FC = () => {
   }
 
   return (
-    <div className="flex min-h-screen w-screen bg-background">
-      {/* Left side: Premium Branding & Visual Backdrop (Desktop only) */}
-      <div className="relative hidden w-1/2 flex-col justify-between bg-emerald-950 p-12 text-white lg:flex overflow-hidden">
-        {/* Background Image with overlay */}
-        <div className="absolute inset-0 z-0">
-          <img 
-            src="https://images.unsplash.com/photo-1542314831-c6a4d1409362?q=80&w=2070&auto=format&fit=crop" 
-            alt="Luxury Resort" 
-            className="w-full h-full object-cover opacity-40 mix-blend-overlay"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-emerald-950 via-emerald-950/80 to-transparent"></div>
-        </div>
-        
-        {/* Header Logo */}
-        <div className="relative z-10 flex items-center gap-2 text-xl font-bold tracking-tight">
-          <svg className="h-6 w-6 text-yellow-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-            <polyline points="9 22 9 12 15 12 15 22"/>
-          </svg>
-          <span className="font-serif text-2xl">StayEase <span className="text-emerald-200/75 font-sans font-normal text-sm ml-2">Resort System</span></span>
-        </div>
-
-        {/* Content Showcase */}
-        <div className="relative z-10 my-auto max-w-lg space-y-6">
-          <h1 className="text-4xl font-serif tracking-wide leading-tight lg:text-5xl text-yellow-50">
-            Streamlining resort hospitality, globally.
-          </h1>
-          <p className="text-lg text-emerald-100/90 font-light leading-relaxed">
-            A comprehensive, cloud-native platform for reservations, guest profiling, payments, housekeeping, and real-time operations.
-          </p>
-          <div className="flex gap-4 items-center pt-2">
-            <div className="flex -space-x-2">
-              <span className="inline-block h-8 w-8 rounded-full ring-2 ring-emerald-950 bg-emerald-800 flex items-center justify-center text-xs font-semibold text-yellow-500">SA</span>
-              <span className="inline-block h-8 w-8 rounded-full ring-2 ring-emerald-950 bg-emerald-800 flex items-center justify-center text-xs font-semibold text-yellow-500">RO</span>
-              <span className="inline-block h-8 w-8 rounded-full ring-2 ring-emerald-950 bg-emerald-800 flex items-center justify-center text-xs font-semibold text-yellow-500">MG</span>
-            </div>
-            <span className="text-sm text-emerald-200">Trusted by top-tier hotel managers.</span>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="relative z-10 text-xs text-emerald-400">
-          © {new Date().getFullYear()} StayEase Inc. All rights reserved.
-        </div>
+    <div className="relative flex min-h-screen w-screen items-center justify-center overflow-hidden bg-emerald-950">
+      <div className="absolute inset-0 z-0">
+        <img
+          src="https://images.unsplash.com/photo-1571896349842-33c89424de2d?q=80&w=2080&auto=format&fit=crop"
+          alt=""
+          className="h-full w-full object-cover opacity-60"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-emerald-950/80 via-emerald-950/50 to-emerald-950/90" />
       </div>
 
-      {/* Right side: Login Form */}
-      <div className="flex w-full flex-col justify-center px-6 py-12 lg:w-1/2 lg:px-16 xl:px-24">
-        <div className="mx-auto w-full max-w-md space-y-8">
-          
-          {/* Form Header */}
-          <div className="space-y-2">
-            <h2 className="text-3xl font-extrabold tracking-tight">Sign in to StayEase</h2>
-            <p className="text-sm text-muted-foreground">
-              Enter your credentials to manage operations.
-            </p>
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-lg border-b border-white/20 shadow-sm">
+        <div className="flex w-full items-center justify-between px-8 sm:px-12 lg:px-16 py-3">
+          <Link to="/" className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-700 shadow-sm">
+              <svg className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                <polyline points="9 22 9 12 15 12 15 22"/>
+              </svg>
+            </div>
+            <span className="text-lg font-bold tracking-tight">StayEase <span className="text-emerald-600 font-normal">Resort</span></span>
+          </Link>
+          <div className="flex items-center gap-1">
+            <div className="hidden items-center gap-1 md:flex">
+              <Link to="/" className="rounded-lg px-3.5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-emerald-50 hover:text-emerald-700">Home</Link>
+              <Link to="/#about" className="rounded-lg px-3.5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-emerald-50 hover:text-emerald-700">About</Link>
+              <Link to="/#rooms" className="rounded-lg px-3.5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-emerald-50 hover:text-emerald-700">Rooms</Link>
+              <Link to="/#amenities" className="rounded-lg px-3.5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-emerald-50 hover:text-emerald-700">Amenities</Link>
+              <Link to="/#testimonials" className="rounded-lg px-3.5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-emerald-50 hover:text-emerald-700">Testimonials</Link>
+              <Link to="/#contact" className="rounded-lg px-3.5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-emerald-50 hover:text-emerald-700">Contact</Link>
+            </div>
+            <div className="hidden items-center gap-2.5 md:flex">
+              <Link to="/register" className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-emerald-700 hover:shadow-md">Book Now</Link>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 h-96 w-96 rounded-full bg-emerald-500/10 blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 h-96 w-96 rounded-full bg-amber-500/10 blur-3xl" />
+      </div>
+
+      <div className="relative z-10 mx-auto w-full max-w-xl px-4 pt-24">
+        <div className="rounded-2xl bg-white/10 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgb(0_0_0_/_0.3)] p-5 sm:p-6">
+          <div className="text-center mb-6">
+            <h1 className="text-xl font-bold text-white">Welcome back</h1>
+            <p className="text-xs text-emerald-100/60 mt-1">Sign in to your resort account</p>
           </div>
 
-          {/* Form Content */}
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            
-            {/* Server side error alert */}
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
             {serverError && (
-              <div className="flex items-center gap-3 rounded-lg bg-destructive/10 border border-destructive/20 p-4 text-sm text-destructive animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-center gap-3 rounded-xl bg-red-500/10 border border-red-500/20 p-4 text-sm text-red-300">
                 <ShieldAlert className="h-5 w-5 shrink-0" />
                 <span>{serverError}</span>
               </div>
             )}
 
-            {/* Email Field */}
-            <div className="space-y-2">
-              <label htmlFor="email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="space-y-1.5">
+              <label htmlFor="email" className="text-xs font-semibold uppercase tracking-wider text-emerald-200/50">
                 Email Address
               </label>
               <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-emerald-200/40">
                   <Mail className="h-4 w-4" />
                 </div>
                 <input
@@ -132,26 +118,28 @@ export const Login: React.FC = () => {
                   id="email"
                   type="email"
                   autoComplete="email"
-                  className={`block w-full rounded-lg border bg-card py-2.5 pl-10 pr-3 text-sm placeholder-muted-foreground shadow-sm transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 ${
-                    errors.email ? "border-destructive focus:border-destructive focus:ring-destructive/20" : "border-border"
+                  className={`block w-full rounded-xl border bg-white/5 py-3 pl-10 pr-3.5 text-sm text-white placeholder-emerald-200/30 shadow-sm transition-all focus:outline-none focus:ring-2 ${
+                    errors.email ? "border-red-400/50 focus:border-red-400 focus:ring-red-500/20" : "border-white/10 focus:border-emerald-400/50 focus:ring-emerald-400/20"
                   }`}
-                  placeholder="name@resort.com"
+                  placeholder="guest@stayease.com"
                 />
               </div>
               {errors.email && (
-                <p className="text-xs text-destructive mt-1 font-medium">{errors.email.message}</p>
+                <p className="text-xs text-red-400 mt-1 font-medium">{errors.email.message}</p>
               )}
             </div>
 
-            {/* Password Field */}
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <label htmlFor="password" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <label htmlFor="password" className="text-xs font-semibold uppercase tracking-wider text-emerald-200/50">
                   Password
                 </label>
+                <Link to="/forgot-password" className="text-xs font-medium text-emerald-300/60 hover:text-emerald-300 transition-colors">
+                  Forgot?
+                </Link>
               </div>
               <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-emerald-200/40">
                   <Lock className="h-4 w-4" />
                 </div>
                 <input
@@ -159,33 +147,32 @@ export const Login: React.FC = () => {
                   id="password"
                   type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
-                  className={`block w-full rounded-lg border bg-card py-2.5 pl-10 pr-10 text-sm placeholder-muted-foreground shadow-sm transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 ${
-                    errors.password ? "border-destructive focus:border-destructive focus:ring-destructive/20" : "border-border"
+                  className={`block w-full rounded-xl border bg-white/5 py-3 pl-10 pr-10 text-sm text-white placeholder-emerald-200/30 shadow-sm transition-all focus:outline-none focus:ring-2 ${
+                    errors.password ? "border-red-400/50 focus:border-red-400 focus:ring-red-500/20" : "border-white/10 focus:border-emerald-400/50 focus:ring-emerald-400/20"
                   }`}
-                  placeholder="••••••••"
+                  placeholder="Enter your password"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground focus:outline-none"
+                  className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-emerald-200/40 hover:text-emerald-200/70 focus:outline-none"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
               {errors.password && (
-                <p className="text-xs text-destructive mt-1 font-medium">{errors.password.message}</p>
+                <p className="text-xs text-red-400 mt-1 font-medium">{errors.password.message}</p>
               )}
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex w-full items-center justify-center rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground shadow-md transition-all hover:bg-primary/95 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.99] duration-150"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:bg-emerald-500 hover:shadow-emerald-500/25 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98] duration-200"
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   Verifying Identity...
                 </>
               ) : (
@@ -194,13 +181,14 @@ export const Login: React.FC = () => {
             </button>
           </form>
 
-          {/* Bottom link */}
-          <p className="text-center text-sm text-muted-foreground">
-            Don't have a guest account?{" "}
-            <Link to="/register" className="font-semibold text-primary hover:underline hover:text-primary/90">
-              Register as Guest
-            </Link>
-          </p>
+          <div className="mt-8 pt-6 border-t border-white/5">
+            <p className="text-center text-sm text-emerald-200/50">
+              Don&apos;t have a guest account?{" "}
+              <Link to="/register" className="font-semibold text-emerald-300 hover:text-emerald-200 transition-colors">
+                Register as Guest
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
     </div>
